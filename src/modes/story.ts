@@ -4,7 +4,7 @@ import type { Sim } from '../sim/sim';
 /**
  * Story Mode: "Career Mode at the Metro City Job Fair". You start as a new hire with three jobs
  * and work your way through six districts. Beating a rival recruits them (unlocks the job for
- * Story). Every level uses the Gacha rules (a card every 20 s) unless it says otherwise, and each
+ * Story). Every level uses the Gacha rules (a card every 15 s) unless it says otherwise, and each
  * has a twist so no two play the same: time attacks, survival, bosses, power surges, sudden death,
  * handicaps, tag teams and a finale. Progress is saved in this browser.
  */
@@ -59,7 +59,7 @@ export const LEVELS: Level[] = [
   L({ id: '1-1', chapter: 1, title: 'Rush Hour', twist: 'Classic rules: no cards. Learn the basics.', rule: 'ko', yours: 1, enemies: ['courier'], classic: true, par: 35,
     intro: [{ who: 'courier', text: 'Out of my lane, new hire! I have forty parcels and zero patience.' }, { who: 'you', text: 'Forty-one. You just dropped one.' }],
     win: [{ who: 'courier', text: 'Fine, fine. You hit like overnight shipping. Want to team up some time?' }], unlocks: ['courier'] }),
-  L({ id: '1-2', chapter: 1, title: 'Order Mix-Up', twist: 'Your first Gacha fight: pick a card now, then every 20 s.', rule: 'ko', yours: 1, enemies: ['waiter'], par: 80,
+  L({ id: '1-2', chapter: 1, title: 'Order Mix-Up', twist: 'Your first Gacha fight: pick a card now, then every 15 s.', rule: 'ko', yours: 1, enemies: ['waiter'], par: 80,
     intro: [{ who: 'waiter', text: 'Table six ordered the soup. You brought them a fight.' }, { who: 'you', text: 'Specials of the day: me.' }],
     win: [{ who: 'waiter', text: 'Service with a smile… a bruised one. I’ll take my tip in experience.' }], unlocks: ['waiter'] }),
   L({ id: '1-3', chapter: 1, title: 'Closing Time', twist: 'Tag team: pick two of your jobs.', rule: 'ko', yours: 2, enemies: ['cleaner', 'merchant'], par: 90,

@@ -1,0 +1,820 @@
+/* The lobby, campaign and preferences share the same printed work sheet. */
+body.portrait { background: var(--bg); }
+
+#panel.wide:has(> .desk-screen) {
+  padding: clamp(12px, 3cqw, 36px);
+  background: rgba(18, 13, 10, .82);
+}
+
+.desk-screen {
+  --desk-text: #564637;
+  --desk-line: #cbbca5;
+  --desk-inset: #e9dfce;
+  --desk-gap: clamp(12px, 1.5cqw, 24px);
+  width: min(100%, 1060px);
+  height: auto;
+  max-height: 100%;
+  margin: auto;
+  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  font: 600 clamp(13px, 1.15cqw, 16px)/1.4 var(--ui);
+}
+
+.desk-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.6cqw, 24px);
+  color: var(--paper);
+}
+
+.desk-head h2 {
+  margin: 0;
+  font: 400 clamp(23px, 3cqw, 41px)/1.05 var(--display);
+  text-wrap: balance;
+}
+
+.desk-head .back,
+.desk-sheet button,
+.brief-footer button {
+  min-height: 36px;
+  font-size: clamp(13px, 1.1cqw, 16px);
+}
+
+.desk-head .back::before {
+  content: '‹';
+  margin-right: .35em;
+}
+
+.desk-sheet {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #9c8063 var(--desk-inset);
+  background: var(--paper);
+  border: 1px solid #9f8467;
+  border-radius: 10px;
+}
+
+.desk-sheet h3 {
+  margin: 0;
+  font: 400 clamp(18px, 1.8cqw, 27px)/1.15 var(--display);
+}
+
+.desk-sheet button:disabled,
+.brief-footer button:disabled {
+  cursor: default;
+}
+
+.m-settings {
+  position: absolute !important;
+  top: 0;
+  right: 0;
+  min-height: 36px;
+  padding: 5px 12px;
+  font-size: clamp(13px, 1.1cqw, 16px);
+}
+
+.settings {
+  width: min(100%, 680px);
+}
+
+.settings-sheet {
+  padding: 0 var(--desk-gap);
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(105px, 29%);
+  align-items: center;
+  gap: var(--desk-gap);
+  padding: clamp(9px, 1.15cqw, 16px) 0;
+}
+
+.setting-row + .setting-row {
+  border-top: 1px solid var(--desk-line);
+}
+
+.setting-row b,
+.setting-row small {
+  display: block;
+}
+
+.setting-row small {
+  margin-top: 2px;
+  color: var(--desk-text);
+  font-size: .92em;
+}
+
+.setting-row select {
+  width: 100%;
+  padding: 5px 8px;
+  min-height: 36px;
+  border: 1px solid #88725a;
+  border-radius: 5px;
+  font: 800 max(16px, 1em) var(--ui);
+  color: var(--ink);
+  background: #fffaf0;
+}
+
+.setting-row select:focus-visible,
+.join input:focus-visible {
+  outline: 2px solid #285c96;
+  outline-offset: 2px;
+}
+
+/* Match format comes first. The rank fits in the same column below it. */
+.match-desk {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+}
+
+.match-setup,
+.match-actions {
+  min-width: 0;
+  padding: var(--desk-gap);
+}
+
+.match-actions {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  border-left: 1px solid var(--desk-line);
+  background: #eee4d2;
+}
+
+.match-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.desk-sheet .match-mode {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+  border: 1px solid #9b8166;
+  border-radius: 6px;
+  box-shadow: none;
+  background: #fffaf0;
+}
+
+.match-mode b {
+  font: 400 1.12em/1.15 var(--display);
+}
+
+.match-mode span,
+.match-description,
+.match-record p,
+.lobby-note {
+  color: var(--desk-text);
+  font: 800 .89em/1.4 var(--ui);
+}
+
+.match-mode[aria-pressed='true'] {
+  background: #fff3c3;
+  border-color: #926615;
+  box-shadow: inset 0 0 0 1px #926615;
+}
+
+.match-mode:disabled {
+  color: var(--desk-text);
+}
+
+.match-description,
+.match-record p,
+.lobby-note {
+  margin: 8px 0 0;
+}
+
+.match-record {
+  border-top: 1px solid var(--desk-line);
+  margin-top: var(--desk-gap);
+  padding-top: var(--desk-gap);
+}
+
+.record-rank {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.record-rank .rk-emb {
+  flex: none;
+  width: clamp(32px, 3.4cqw, 44px);
+  height: clamp(32px, 3.4cqw, 44px);
+}
+
+.record-rank b,
+.record-rank span:not(.rk-emb) {
+  display: block;
+}
+
+.record-rank b {
+  font: 400 1.18em/1.2 var(--display);
+}
+
+.record-rank span:not(.rk-emb) {
+  color: var(--desk-text);
+  font-size: .89em;
+}
+
+.match-record .pr-hist {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  font-size: .85em;
+}
+
+.lobby-join {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.lobby-join label {
+  font-size: .9em;
+  font-weight: 800;
+}
+
+.lobby-join .join input {
+  min-height: 36px;
+  font: 800 16px/1.1 var(--ui);
+  letter-spacing: .12em;
+}
+
+.lobby-join .join input::placeholder {
+  color: #665746;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.match-actions .lobby-code {
+  flex-direction: row;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .93em;
+}
+
+.match-actions .lobby-code b {
+  font-size: 1.35em;
+}
+
+.match-actions .pvp-status,
+.match-actions .pvp-error {
+  color: var(--ink);
+  font: 800 .92em/1.3 var(--ui);
+}
+
+.match-actions .pvp-status .spin {
+  margin-right: 6px;
+  border-color: #b7a182;
+  border-top-color: #704b22;
+}
+
+/* The chapter rail names the destination even while it is locked. */
+.story-total,
+.brief-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: none;
+  color: #ffdc73;
+  font: 400 clamp(13px, 1.5cqw, 20px)/1 var(--display);
+}
+
+.story-desk {
+  padding: var(--desk-gap);
+}
+
+.districts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.desk-sheet .district {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 6px;
+  min-height: 48px;
+  padding: 4px 6px;
+  white-space: normal;
+  background: #fffaf0;
+  border: 1px solid #b29b80;
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.district[aria-pressed='true'] {
+  background: #fff3c3;
+  border-color: #926615;
+  box-shadow: inset 0 0 0 1px #926615;
+}
+
+.desk-sheet .district:disabled {
+  background: var(--desk-inset);
+  border-color: var(--desk-line);
+  color: var(--desk-text);
+}
+
+.district .ch-emb {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.district:disabled .ch-emb {
+  filter: grayscale(.85);
+}
+
+.district b,
+.district small {
+  display: block;
+  font: 800 12px/1.22 var(--ui);
+}
+
+.district > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.district small {
+  margin-top: 2px;
+  color: var(--desk-text);
+  font-size: 11px;
+}
+
+.story-route {
+  display: grid;
+  grid-template-columns: 1fr 3.4fr;
+  gap: var(--desk-gap);
+  margin-top: var(--desk-gap);
+}
+
+.chapter-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.chapter-summary .district-art {
+  display: block;
+  width: min(100%, 112px);
+  aspect-ratio: 1;
+}
+
+.district-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chapter-summary span:not(.district-art),
+.chapter-summary p {
+  color: var(--desk-text);
+  font-size: .9em;
+}
+
+.chapter-summary h3 {
+  margin: 3px 0 5px;
+}
+
+.chapter-summary p {
+  margin: 0;
+}
+
+.level-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.desk-sheet .lv {
+  display: grid;
+  grid-template-columns: auto minmax(24px, auto) 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1cqw, 16px);
+  min-height: 52px;
+  padding: 7px 10px;
+  border: 1px solid #b29b80;
+  border-radius: 6px;
+  background: #fffaf0;
+  box-shadow: none;
+  text-align: left;
+}
+
+.desk-sheet .lv:not(:disabled):hover {
+  background: #fff3c3;
+}
+
+.desk-sheet .lv.done {
+  background: #e9efdf;
+}
+
+.desk-sheet .lv.boss:not(:disabled) .lv-title {
+  color: #963822;
+}
+
+.desk-sheet .lv.locked {
+  opacity: 1;
+  background: var(--desk-inset);
+  color: var(--desk-text);
+  border-color: var(--desk-line);
+}
+
+.desk-sheet .lv-id {
+  font: 800 .82em/1.15 var(--ui);
+  color: var(--desk-text);
+}
+
+.desk-sheet .lv-face,
+.desk-sheet .lv-lock {
+  flex: none;
+  width: clamp(23px, 2.6cqw, 36px);
+  height: clamp(23px, 2.6cqw, 36px);
+  border-radius: 5px;
+}
+
+.lv-lock img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.level-summary {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.desk-sheet .lv-title {
+  font: 400 clamp(14px, 1.25cqw, 19px)/1.15 var(--display);
+}
+
+.desk-sheet .lv-twist,
+.desk-sheet .lv-unlock {
+  font: 800 .85em/1.3 var(--ui);
+  color: var(--desk-text);
+}
+
+.desk-sheet .lv-foot {
+  text-align: right;
+}
+
+.desk-sheet .stars {
+  font-size: clamp(13px, 1.4cqw, 19px);
+  -webkit-text-stroke: .65px #4b3417;
+}
+
+.desk-sheet .stars i {
+  color: #75644e;
+  -webkit-text-stroke: 0;
+}
+
+.brief-score .stars i {
+  color: #b6a88e;
+}
+
+.crew-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid var(--desk-line);
+  margin-top: var(--desk-gap);
+  padding-top: 10px;
+}
+
+.crew-strip b {
+  flex: none;
+  font-size: .9em;
+}
+
+.crew-strip b span {
+  margin-left: 3px;
+  font-weight: 600;
+  color: var(--desk-text);
+}
+
+.crew-strip > div {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.crew-strip .rs {
+  width: clamp(20px, 2.2cqw, 28px);
+  height: clamp(20px, 2.2cqw, 28px);
+}
+
+/* Match briefing and roster sit on separate halves of the same sheet. */
+.level-desk {
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+}
+
+.level-brief,
+.level-crew {
+  min-width: 0;
+  padding: var(--desk-gap);
+}
+
+.level-crew {
+  border-left: 1px solid var(--desk-line);
+  background: #eee4d2;
+}
+
+.brief-twist {
+  margin: 8px 0;
+  font-weight: 800;
+}
+
+.level-brief .lv-rules,
+.level-brief .lv-cards {
+  color: var(--desk-text);
+  font: 800 .9em/1.35 var(--ui);
+}
+
+.level-brief .dialogue {
+  gap: 8px;
+  margin-top: 12px;
+  border-top: 1px solid var(--desk-line);
+  padding-top: 12px;
+}
+
+.level-brief .dl {
+  align-items: flex-start;
+}
+
+.level-brief .dl-face {
+  width: 35px;
+  height: 35px;
+}
+
+.level-brief .dl > div {
+  padding: 6px 9px;
+  background: #fffaf0;
+  border: 1px solid var(--desk-line);
+  border-radius: 6px;
+}
+
+.level-brief .dl.me > div {
+  background: #e2ebf5;
+}
+
+.level-brief .dl b,
+.level-brief .dl p {
+  font-size: .88em;
+}
+
+.level-crew .pp-slots {
+  margin: 12px 0;
+  gap: 6px;
+}
+
+.pslot b,
+.pslot small {
+  display: block;
+}
+
+.pslot small {
+  font-family: var(--ui);
+  font-size: .82em;
+}
+
+.level-crew .pslot {
+  font-size: .94em;
+}
+
+.level-crew .pslot img,
+.level-crew .pslot svg {
+  width: clamp(26px, 3cqw, 38px) !important;
+  height: clamp(26px, 3cqw, 38px) !important;
+}
+
+.level-crew .pslot.empty {
+  width: auto;
+  min-height: 30px;
+  height: auto;
+  padding: 4px 8px;
+  border-color: #80694f;
+  color: var(--desk-text);
+  font-size: .85em;
+}
+
+.level-crew .vs-mini {
+  color: var(--ink);
+  font-size: .9em;
+  -webkit-text-stroke: 0;
+}
+
+.level-crew .mini-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+  padding: 0;
+  gap: 6px;
+}
+
+.level-crew .badge.mini .face {
+  width: clamp(29px, 4.9cqw, 50px);
+  height: clamp(29px, 4.9cqw, 50px);
+}
+
+.level-crew .badge.mini .bname {
+  font-size: max(12px, .95em);
+}
+
+.level-crew .badge.mini .brole {
+  font-size: max(10px, .72em);
+}
+
+.brief-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--paper);
+}
+
+.brief-footer button:disabled {
+  background: #bcb09e;
+}
+
+/* Match navigation and playback are separate clusters over the ring. */
+#controls {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px 12px;
+  padding: 8px clamp(6px, 1.5cqw, 20px);
+}
+
+.fight-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #7e6550;
+  border-radius: 7px;
+  background: #2a1d14;
+}
+
+#controls button,
+.fight-more summary {
+  min-height: 30px;
+  padding: 4px clamp(6px, .9cqw, 13px);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--paper);
+  box-shadow: none;
+  font: 800 clamp(12px, 1.08cqw, 16px)/1.2 var(--ui);
+}
+
+#controls button:hover,
+.fight-more summary:hover,
+.fight-more[open] summary {
+  background: #4b3728;
+  border-color: #7e6550;
+}
+
+.fight-more {
+  position: relative;
+}
+
+.fight-more summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fight-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.fight-more summary::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-top: 1px solid currentColor;
+  border-left: 1px solid currentColor;
+  transform: translateY(1px) rotate(45deg);
+}
+
+.fight-more[open] summary::after {
+  transform: translateY(-1px) rotate(225deg);
+}
+
+.fight-more > div {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  display: grid;
+  min-width: 104px;
+  padding: 3px;
+  border: 1px solid #7e6550;
+  border-radius: 7px;
+  background: #2a1d14;
+}
+
+.fight-more > div button {
+  text-align: left;
+}
+
+@container (max-width: 720px) {
+  .districts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .story-route {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-summary {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .chapter-summary .district-art {
+    flex: none;
+    width: 44px;
+  }
+}
+
+@container (max-width: 590px) {
+  .desk-screen {
+    margin-block: 0 auto;
+  }
+
+  .match-desk,
+  .level-desk {
+    grid-template-columns: 1fr;
+  }
+
+  .match-actions,
+  .level-crew {
+    border-top: 1px solid var(--desk-line);
+    border-left: 0;
+  }
+
+  .desk-head .back,
+  .desk-sheet button,
+  .brief-footer button,
+  .setting-row select {
+    min-height: 41px;
+  }
+
+  .desk-sheet .level-crew .mini-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .district .ch-emb {
+    width: 18px;
+    height: 18px;
+  }
+
+  .desk-sheet .lv {
+    grid-template-columns: auto auto 1fr;
+  }
+
+  .desk-sheet .lv-foot {
+    grid-column: 3;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    text-align: left;
+  }
+
+  #controls button,
+  .fight-more summary {
+    min-height: 34px;
+  }
+}
+
+@container (max-width: 365px) {
+  .districts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-brief .dl,
+  .match-actions .pvp-status .spin {
+    animation: none;
+  }
+}

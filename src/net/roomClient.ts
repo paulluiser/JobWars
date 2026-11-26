@@ -163,7 +163,7 @@ export class RoomClient {
 
   send(action: RoomAction) {
     if (this.ended) return;
-    this.pending.set(action.t, action);
+    this.pending.set(action.t === 'reroll' ? `reroll-${action.pick}-${action.reroll}` : action.t, action);
     this.sendRaw(action);
   }
 

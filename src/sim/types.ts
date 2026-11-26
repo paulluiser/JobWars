@@ -53,6 +53,8 @@ export interface SkillText {
 
 export interface FighterDef {
   id: string;
+  displayName: string;
+  /** job name, e.g. "Chef" */
   name: string;
   /** small print on the ID badge, e.g. "Kitchen dept." */
   title: string;

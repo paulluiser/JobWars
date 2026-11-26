@@ -776,10 +776,11 @@ Decided at M3: **manual in ChatGPT** for the pilots (Chef, Firefighter, Fisher).
   damage taken (fraction of own max HP ×92) and 1.8/s passive. Full = the special fires and the bar empties.
   First special ≈19 s into a duel, ≈1.6 specials per fighter. 1v1 and 2v2 were re-tuned around it
   (44–57% and 43–55% win rates).
-- **Gacha**: 82 cards (45 general 15/15/15, 7 class, 30 job), a pick before the fight and every 20 s,
-  rarity odds rising per pick, 2 rerolls, 12 s pick timer, ×4.2 HP, 3:00 limit, overtime from 1:40 (+25% damage
-  per 10 s, healing ×0.4). Average match 2.0 min, ~7% go the distance. Separate Gacha job-balance layer
-  (42–56%). Commons win ~43–47%, epics ~55–60%, by design.
+- **Gacha**: 82 cards (45 general 15/15/15, 7 class, 30 job), a pick before the fight and every 15 s.
+  Each round shares one rarity across teams and two rerolls per player, with better odds for rare and epic rounds
+  later in the match. Combat drafts have a 12 s timer. Gacha uses ×4.5 HP, a 2:30 limit, and overtime from
+  1:40 (+25% damage per 10 s, healing ×0.4). Average combat time is about two minutes. Gacha has its own
+  job-balance layer.
 - **PvP** over PeerJS (WebRTC); lockstep from seed + picks; engine-independent maths; result hash;
   Elo MMR (K 48 placement / 32 / 24 above 1500) with seven job-title ranks; quick match by rank tier.
 - **Story**: six chapters × four levels, varied rules (classic, time attack, survive 1v2, bosses, power surge,

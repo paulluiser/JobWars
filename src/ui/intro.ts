@@ -26,7 +26,7 @@ export class Intro {
     const side = (team: FighterDef[], cls: string) => `
       <div class="in-side ${cls}">
         <div class="in-busts">${team.map((d, i) => `<div class="in-bust" style="--d:${i * 0.08}s">${face(d, 'bust')}</div>`).join('')}</div>
-        <div class="in-names">${team.map((d) => `<div class="in-name"><b style="--c:${hex(d.accent)}">${esc(d.name)}</b><span>${esc(d.role)} · ${esc(d.title)}</span></div>`).join('')}</div>
+        <div class="in-names">${team.map((d) => `<div class="in-name"><b style="--c:${hex(d.accent)}">${esc(d.displayName)}</b><span title="${esc(d.title)}">${esc(d.name)} · ${esc(d.role)}</span></div>`).join('')}</div>
       </div>`;
     this.el.innerHTML = `
       <div class="in-band blue"></div><div class="in-band red"></div>

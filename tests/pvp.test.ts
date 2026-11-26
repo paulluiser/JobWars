@@ -100,6 +100,22 @@ describe('PvP lobby connection errors', () => {
     expect(pick.ids).toEqual(['chef']);
   });
 
+  it('accepts Gacha picks with a valid reroll count', async () => {
+    const join = PvpSession.joinLobby('KC77N', 'gacha1', 1000);
+    await vi.advanceTimersByTimeAsync(0);
+    const guest = peers[0];
+    guest.connection.emit('open');
+    await vi.advanceTimersByTimeAsync(0);
+    guest.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'gacha1' });
+    const session = await join;
+    const card = { t: 'card', team: 0, pick: 1, id: 'hard-hat' };
+    guest.connection.emit('data', { ...card, reroll: 3 });
+    guest.connection.emit('data', card);
+    guest.connection.emit('data', { ...card, reroll: 2 });
+    const pick = await session.wait((m): m is Extract<Msg, { t: 'card' }> => m.t === 'card');
+    expect(pick).toEqual({ ...card, reroll: 2 });
+  });
+
   it('ends a waiting lobby when its signaling connection drops', async () => {
     const lobby = await PvpSession.createLobby('classic1', 1000, new AbortController().signal);
     const rejected = expect(lobby.ready).rejects.toThrow(/lobby.*disconnected/i);

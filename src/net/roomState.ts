@@ -105,6 +105,7 @@ export class Room {
         this.finish({ tick: verified!.tick, hash: roomCheckpoint(verified!), winner: verified!.winner ?? -1 }, now);
       } else {
         this.pick++;
+        this.rerolls = [0, 0];
         this.phase = 'draft';
         this.at = now + 12_000;
       }

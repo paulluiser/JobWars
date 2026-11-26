@@ -84,14 +84,13 @@ export class DraftOverlay {
     };
     this.draw();
     this.el.className = 'show';
-    let left = v.timer;
     clearInterval(this.timer);
-    if (left > 0) {
+    if (v.timer > 0) {
       this.timer = window.setInterval(() => {
-        left -= 1;
+        v.timer--;
         const t = this.el.querySelector('.dr-timer');
-        if (t) t.textContent = `${left}s`;
-        if (left <= 0 && this.v) {
+        if (t) t.textContent = `${v.timer}s`;
+        if (v.timer <= 0 && this.v) {
           if (this.v.serverDeadline) this.cancel();
           else this.finish(this.v.offers[Math.floor(Math.random() * this.v.offers.length)]);
         }

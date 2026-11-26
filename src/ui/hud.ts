@@ -3,6 +3,7 @@ import type { Fighter } from '../sim/types';
 import { face } from './face';
 import { CARD_BY_ID } from '../data/cards';
 import { cardIcon } from './cards';
+import { skillIcon } from './skillArt';
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -63,10 +64,10 @@ class Banner {
       <div class="tape"></div>
       <div class="portrait" style="background:${hex(d.color)}">${face(d, 'icon')}</div>
       <div class="info">
-        <div class="row"><span><span class="name">${d.name}</span><span class="title">${d.title}</span></span><span class="hpnum"></span></div>
+        <div class="row"><span><span class="name" title="${d.name} · ${d.role}">${d.displayName}</span><span class="title">${d.name} · ${d.role}</span></span><span class="hpnum"></span></div>
         <div class="bar"><div class="ghost"></div><div class="fill"></div></div>
         <div class="gbar"><div></div></div>
-        <div class="skills-row"><span class="sk ac" title="${d.active.simple}"><span class="cd"></span>${d.active.name}</span><span class="sk sp" title="${d.special.simple}"><span class="rage"></span><span class="sp-t">Rage</span></span></div>
+        <div class="skills-row"><span class="sk ac" title="${d.active.simple}"><span class="cd"></span>${skillIcon(d.id, 'active')}${d.active.name}</span><span class="sk sp" title="${d.special.simple}"><span class="rage"></span>${skillIcon(d.id, 'special')}<span class="sp-t">Rage</span></span></div>
         <div class="chips"></div>
         <div class="hcards"></div>
       </div>`;

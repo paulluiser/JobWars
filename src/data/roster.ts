@@ -11,6 +11,7 @@ import { RATINGS, statsFromRatings } from './attributes';
 
 const CHEF: FighterDef = {
   id: 'chef',
+  displayName: 'Luca',
   name: 'Chef',
   title: 'Kitchen dept.',
   role: 'Fighter',
@@ -44,6 +45,7 @@ const CHEF: FighterDef = {
 
 const FIREFIGHTER: FighterDef = {
   id: 'firefighter',
+  displayName: 'Rafa',
   name: 'Firefighter',
   title: 'Station 9',
   role: 'Tank',
@@ -77,6 +79,7 @@ const FIREFIGHTER: FighterDef = {
 
 const ELECTRICIAN: FighterDef = {
   id: 'electrician',
+  displayName: 'Jiro',
   name: 'Electrician',
   title: 'Grid maintenance',
   role: 'Mage',
@@ -110,6 +113,7 @@ const ELECTRICIAN: FighterDef = {
 
 const NURSE: FighterDef = {
   id: 'nurse',
+  displayName: 'Mina',
   name: 'Nurse',
   title: 'Ward 3, night shift',
   role: 'Support',
@@ -143,6 +147,7 @@ const NURSE: FighterDef = {
 
 const COURIER: FighterDef = {
   id: 'courier',
+  displayName: 'Kai',
   name: 'Courier',
   title: 'Same-day delivery',
   role: 'Assassin',
@@ -176,6 +181,7 @@ const COURIER: FighterDef = {
 
 const FISHER: FighterDef = {
   id: 'fisher',
+  displayName: 'Finn',
   name: 'Fisher',
   title: 'Harbor, pier 4',
   role: 'Marksman',

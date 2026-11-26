@@ -125,11 +125,12 @@ The game opens on a main menu with three modes:
 
 ### Gacha (Chaos-style card draft)
 
-Pick 1 of 3 cards before the fight, then the fight pauses for another pick **every 20 s** (12 s countdown,
-2 rerolls a match). Odds shift toward rare and epic picks as the match goes on. **82 cards**
+Pick 1 of 3 cards before the fight and **every 15 s** of combat. All offers in a round share one
+rarity across both teams and both rerolls. You get two rerolls each round and 12 seconds to pick
+during combat. Odds shift toward rare and epic picks as the match goes on. **82 cards**
 (`src/data/cards.ts`): 45 general (15 common, 15 rare, 15 epic), 7 class cards (one per role) and 30 job
-cards, offered only to a team with that class or job. Gacha matches run 2–3 minutes (×4.2 HP, 3:00 limit);
-from 1:40 **overtime** ramps damage up and cuts healing so stalling doesn't win. The **Cards** button (B)
+cards, offered only to a team with that class or job. Gacha matches average about two minutes of combat (×4.5 HP, 2:30 limit).
+From 1:40, **overtime** ramps up damage and cuts healing. The **Cards** button (B)
 shows both sides' cards; each HUD ID card shows its card strip. Gacha has its own job-balance layer
 (`src/data/gachaBalance.ts`).
 

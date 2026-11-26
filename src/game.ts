@@ -45,10 +45,15 @@ export interface MatchSpec {
   extra?: Partial<SimOpts>;
   /** cards a side starts with on top of its draft (Story) */
   startCards?: [string[], string[]];
+  /** the draft and pacing recorded in a share link */
+  sharedDraft?: { log: Pick[]; legacy: boolean };
   /** how many of the picks fight for Blue (default: half). Story handicaps are 1 vs 2. */
   blue?: number;
   /** the other player's picks (online PvP) */
-  remote?: { pick(team: Team, pick: number): Promise<string>; send(team: Team, pick: number, id: string): void };
+  remote?: {
+    pick(team: Team, pick: number, offers: (reroll: number) => Card[]): Promise<string>;
+    send(team: Team, pick: number, reroll: number, id: string): void;
+  };
   /** called once when the fight is decided (Story progress, PvP MMR) */
   onEnd?: (sim: Sim) => void;
   /** replaces the standard match report (Story's result card) */
@@ -110,8 +115,6 @@ export class Game {
   /** Gacha: every pick so far (replays and share links re-apply them) */
   draftLog: Pick[] = [];
   /** picks loaded from a share link: used instead of asking anyone */
-  private presetLog: Pick[] | null = null;
-  private rerollsUsed: [number, number] = [0, 0];
   private drafting = false;
   draft!: DraftOverlay;
   title!: TitleScreen;
@@ -163,8 +166,8 @@ export class Game {
     // ?g=0.0.hard-hat,1.0.phoenix,…  = a Gacha match's whole draft (team.pick.card)
     const g = q.get('g');
     if (g) {
-      this.presetLog = g.split(',').map((x) => x.split('.')).filter((x) => x.length === 3 && CARD_BY_ID.has(x[2])).map(([t, p, id]) => ({ team: Number(t) as Team, pick: Number(p), id }));
-      this.spec = { kind: 'cpu', gacha: true, control: ['cpu', 'cpu'] };
+      const log = g.split(',').map((x) => x.split('.')).filter((x) => x.length === 3 && CARD_BY_ID.has(x[2])).map(([t, p, id]) => ({ team: Number(t) as Team, pick: Number(p), id }));
+      this.spec = { kind: 'cpu', gacha: true, control: ['cpu', 'cpu'], sharedDraft: { log, legacy: q.get('gv') !== '2' } };
     }
     const arena = q.get('arena');
     if (arena !== null && isArenaId(arena)) this.spec = { ...this.spec, arena };
@@ -251,7 +254,10 @@ export class Game {
     u.searchParams.set('red', this.picks.slice(h).map((d) => d.id).join(','));
     u.searchParams.set('seed', String(this.seed));
     if (this.scene.arenaId !== DEFAULT_ARENA) u.searchParams.set('arena', this.scene.arenaId);
-    if (this.spec.gacha && this.draftLog.length) u.searchParams.set('g', this.draftLog.map((p) => `${p.team}.${p.pick}.${p.id}`).join(','));
+    if (this.spec.gacha && this.draftLog.length) {
+      u.searchParams.set('g', this.draftLog.map((p) => `${p.team}.${p.pick}.${p.id}`).join(','));
+      if (!this.spec.sharedDraft?.legacy) u.searchParams.set('gv', '2');
+    }
     return u.toString();
   }
 
@@ -345,7 +351,7 @@ export class Game {
   }
 
   private go(r: SelectResult) {
-    if ((r as { mode: string }).mode === 'menu') return this.showMenu();
+    if (r.mode === 'menu') return this.showMenu();
     if (r.mode === 'tourney') {
       const ids = r.entrants.map((d) => d.id);
       const entries: Entry[] = r.format === 'tag' ? ids.flatMap((_, i) => (i % 2 ? [] : [[ids[i], ids[i + 1]]])) : ids.map((id) => [id]);
@@ -377,6 +383,9 @@ export class Game {
   }
 
   // ---------------- main menu ----------------
+  get cardDetails() { return this.select.detailed; }
+  set cardDetails(detailed: boolean) { this.select.detailed = detailed; }
+
   showMenu() {
     this.leaveMatch();
     this.tourney = null;
@@ -811,11 +820,12 @@ export class Game {
       names: me === 0 ? ['You', 'Rival'] : ['Rival', 'You'],
       remote: {
         // the rival's pick arrives over the network; if they drop, the CPU picks for them
-        pick: (t, n) => Promise.race([
-          sess.wait((m): m is Extract<Msg, { t: 'card' }> => m.t === 'card' && m.team === t && m.pick === n).then((m) => m.id),
-          closed.then(() => cpuPick(seed, t, n, offersFor(seed, t, n, 0, this.teams()[t], this.draftLog.filter((p) => p.team === t).map((p) => p.id)))?.id ?? ''),
+        pick: (t, n, offers) => Promise.race([
+          sess.wait((m): m is Extract<Msg, { t: 'card' }> => m.t === 'card' && m.team === t && m.pick === n &&
+            offers(m.reroll).some((card) => card.id === m.id)).then((m) => m.id),
+          closed.then(() => cpuPick(seed, t, n, offers(0))?.id ?? ''),
         ]),
-        send: (t, n, id) => sess.send({ t: 'card', team: t, pick: n, id }),
+        send: (t, n, reroll, id) => sess.send({ t: 'card', team: t, pick: n, reroll, id }),
       },
       onEnd: (sim) => void this.pvpFinish(sim, me),
       resultActions: '<button class="primary" data-act="pvprematch">Rematch</button><button data-act="share">Share this fight</button><button data-act="pvpleave">Leave</button>',
@@ -947,7 +957,7 @@ export class Game {
       blue: mine.length,
       gacha: !l.classic,
       control: ['human', 'cpu'],
-      names: ['You', enemies.map((d) => d.name).join(' & ')],
+      names: ['You', enemies.map((d) => d.displayName).join(' & ')],
       startCards: [o.myCards ?? [], o.enemyCards ?? []],
       extra,
       onEnd: (sim) => {
@@ -1071,7 +1081,6 @@ export class Game {
   private async begin(seed: number) {
     this.seed = seed;
     this.draftLog = [];
-    this.rerollsUsed = [0, 0];
     this.drafting = false;
     if (this.spec.gacha) {
       this.started = false;
@@ -1092,6 +1101,7 @@ export class Game {
   private simOpts(): SimOpts {
     const pre = (t: Team) => [...(this.spec.startCards?.[t] ?? []), ...this.draftLog.filter((p) => p.team === t && p.pick === 0).map((p) => p.id)];
     const base: SimOpts = this.spec.gacha ? gachaOpts([pre(0), pre(1)]) : { cards: [pre(0), pre(1)] };
+    if (this.spec.sharedDraft?.legacy) Object.assign(base, { hpMul: 4.2, timeLimit: 180, surgeEvery: 20, overtimeAt: 100 });
     return { ...base, ...this.spec.extra };
   }
 
@@ -1115,20 +1125,21 @@ export class Game {
     const teams = this.teams();
     const owned = (t: Team) => [...(spec.startCards?.[t] ?? []), ...this.draftLog.filter((p) => p.team === t).map((p) => p.id)];
     const choose = async (t: Team): Promise<string> => {
-      const preset = this.presetLog?.find((p) => p.team === t && p.pick === pick);
+      let reroll = 0;
+      const preset = spec.sharedDraft?.log.find((p) => p.team === t && p.pick === pick);
       if (preset) return preset.id;
-      const offers = () => offersFor(this.seed, t, pick, this.rerollsUsed[t], teams[t], owned(t));
+      const offers = (attempt = reroll) => offersFor(this.seed, t, pick, attempt, teams[t], owned(t));
       const side = spec.control[t];
       if (side === 'cpu') return cpuPick(this.seed, t, pick, offers())?.id ?? '';
-      if (side === 'remote') return spec.remote ? spec.remote.pick(t, pick) : '';
+      if (side === 'remote') return spec.remote ? spec.remote.pick(t, pick, offers) : '';
       const first = offers();
       if (!first.length) return '';
       const names = spec.names ?? ['You', 'CPU'];
       const card: Card = await this.draft.pick({
         title: pick === 0 ? 'Choose your first card' : `Card pick ${pick + 1}`,
-        subtitle: pick === 0 ? 'A new pick comes every 20 seconds. Rarer cards show up later.' : `${Math.round(this.sim?.t ?? 0)}s · the fight is paused`,
+        subtitle: pick === 0 ? `Draft every ${spec.extra?.surgeEvery ?? GACHA.surgeEvery} seconds of combat. Both sides share the round’s rarity.` : `${Math.round(this.sim?.t ?? 0)}s · the fight is paused`,
         offers: first,
-        rerollsLeft: GACHA.rerolls - this.rerollsUsed[t],
+        rerollsLeft: GACHA.rerolls - reroll,
         timer: pick === 0 ? 25 : 12,
         detailed: this.select.detailed,
         team: teams[t],
@@ -1136,12 +1147,12 @@ export class Game {
         rivalOwned: owned((1 - t) as Team),
         rivalName: names[1 - t],
       }, () => {
-        this.rerollsUsed[t]++;
+        reroll++;
         this.sfx.ui('tab');
         return offers();
       });
       this.sfx.ui('go');
-      spec.remote?.send(t, pick, card.id);
+      spec.remote?.send(t, pick, reroll, card.id);
       return card.id;
     };
     const ids = await Promise.all(([0, 1] as Team[]).map(choose));
@@ -1174,7 +1185,7 @@ export class Game {
     if (!this.spec.gacha && !this.sim.fighters.some((f) => f.cards.length)) return;
     if (this.buffsEl.classList.contains('show')) return this.hideBuffs();
     const cards: [string[], string[]] = [0, 1].map((t) => this.sim.fighters.find((f) => f.team === t)?.cards ?? []) as [string[], string[]];
-    const names = this.spec.names ?? [this.teams()[0].map((d) => d.name).join(' & '), this.teams()[1].map((d) => d.name).join(' & ')];
+    const names = this.spec.names ?? [this.teams()[0].map((d) => d.displayName).join(' & '), this.teams()[1].map((d) => d.displayName).join(' & ')];
     this.buffsEl.innerHTML = buffPanelHtml(names as [string, string], cards, this.select.detailed);
     this.buffsEl.classList.add('show');
     this.paused = true;
@@ -1530,7 +1541,7 @@ export class Game {
               fx.ring(b.x, b.y, 0xffffff, 200, 0.5, 10);
               fx.shards(b.x, b.y - 60, b.def.color, 12);
             }
-            fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.name.toUpperCase()} DOWN!`, { color: 0xff5a46, size: on ? 46 : 28, toss: false, dur: 1.4 });
+            fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.displayName.toUpperCase()} DOWN!`, { color: 0xff5a46, size: on ? 46 : 28, toss: false, dur: 1.4 });
             break;
           }
           j.addHitstop(0.18);
@@ -1635,7 +1646,7 @@ export class Game {
     const tint = special ? 0xffd23f : col;
     const c = v.point('chest');
     if (this.juice.enabled) fx.castBurst(c.x, c.y, tint, special);
-    fx.castPlate(() => v.point('head'), name, col, special, special ? 'SPECIAL' : a.def.name.toUpperCase());
+    fx.castPlate(() => v.point('head'), name, col, special, special ? 'SPECIAL' : a.def.displayName.toUpperCase());
     const t = F[a.targetIdx];
     const tv = t && this.scene.views[t.idx];
     if (t && tv && t.state !== 'ko' && t.team !== a.team) {

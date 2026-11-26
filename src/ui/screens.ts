@@ -5,7 +5,8 @@ import type { Fighter, FighterDef, Role } from '../sim/types';
 import { face } from './face';
 import { signature } from '../data/attributes';
 import { SIZES, type Format } from '../modes/tournament';
-import { CARD_BY_ID } from '../data/cards';
+import { CARD_BY_ID, GACHA } from '../data/cards';
+import { skillIcon, type SkillKind } from './skillArt';
 
 const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -43,10 +44,6 @@ function statBars(d: FighterDef) {
   return `<div class="sig"><span class="sig-best">Strength: ${sig.best}</span><span class="sig-worst">Weakness: ${sig.worst}</span></div><div class="stats">${rows}</div>`;
 }
 
-function skillBlock(kind: string, tag: string, name: string, text: string, extra = '') {
-  return `<div class="skill ${kind}"><div class="skill-tag">${tag}</div><div class="skill-name">${esc(name)}</div><p>${esc(text)}</p>${extra}</div>`;
-}
-
 export type Mode = 'duel' | 'tag' | 'tourney';
 export const MODE_LABEL: Record<Mode, string> = { duel: '1v1', tag: 'Tag Team', tourney: 'Tournament' };
 
@@ -68,6 +65,7 @@ export interface SelectState {
 }
 
 export type SelectResult =
+  | { mode: 'menu' }
   | { mode: 'duel' | 'tag'; picks: FighterDef[]; gacha: boolean; arena: ArenaChoice }
   | { mode: 'tourney'; entrants: FighterDef[]; format: Format };
 
@@ -102,131 +100,192 @@ export function setMode(st: SelectState, mode: Mode) {
  */
 export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: SelectResult) => void, onMode?: (m: Mode) => void) {
   let hintFlash = '';
+  let profile: 'skills' | 'stats' = 'skills';
+  let skill: SkillKind = 'passive';
+  const tabs = (Object.keys(MODE_LABEL) as Mode[]).map((m) =>
+    `<button data-mode="${m}" role="tab">${MODE_LABEL[m]}</button>`).join('');
+  const filters = ROLES.map((r) =>
+    `<button class="rf" data-role="${r}" style="--rc:${r === 'All' ? '#2a1d14' : ROLE_COLORS[r]}">${r}</button>`).join('');
+
+  panel.innerHTML = `<div class="select">
+    <header class="select-top">
+      <button class="back" data-sel="back" aria-label="Back to the main menu">‹ Menu</button>
+      <h2>CPU Battle</h2>
+      <nav class="modes" role="tablist" aria-label="Battle mode">${tabs}</nav>
+    </header>
+    <div data-roster-setup></div>
+    <div class="sel-body">
+      <div class="pick-col">
+        <div class="filters" role="group" aria-label="Filter by role">${filters}</div>
+        <div class="grid" aria-label="Fighters">
+        ${ROSTER.map((d) => `<button class="badge" data-pick="${d.id}" style="--rc:${ROLE_COLORS[d.role]}"
+          aria-label="${esc(d.displayName)}, ${esc(d.name)}, ${d.role}">
+          <span class="strap"></span>
+          <span class="face" style="background:${hex(d.color)}">${face(d, 'icon')}</span>
+          <span class="bname">${esc(d.displayName)}</span><span class="brole">${esc(d.name)}</span>
+          <span class="marks" aria-hidden="true"></span>
+        </button>`).join('')}
+        </div>
+      </div>
+      <aside class="detail" aria-label="Fighter profile"></aside>
+    </div>
+    <footer class="roster-footer">
+      <div class="sel-foot" data-roster-actions></div>
+      <div class="credits">Sound effects from <a href="https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/" target="_blank" rel="noopener">Oculus Audio Pack 01</a> by Oculus VR, LLC, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</div>
+    </footer>
+  </div>`;
+  const screen = panel.firstElementChild as HTMLElement;
+  const setup = screen.querySelector<HTMLElement>('[data-roster-setup]')!;
+  const detail = screen.querySelector<HTMLElement>('.detail')!;
+  const dock = screen.querySelector<HTMLElement>('[data-roster-actions]')!;
+  const modeButtons = screen.querySelectorAll<HTMLButtonElement>('[data-mode]');
+  const filterButtons = screen.querySelectorAll<HTMLButtonElement>('[data-role]');
+  const badges = screen.querySelectorAll<HTMLButtonElement>('[data-pick]');
+  const regions = new Map<HTMLElement, string>();
+  const update = (region: HTMLElement, html: string) => {
+    if (regions.get(region) === html) return;
+    const focused = document.activeElement as HTMLElement | null;
+    const focusAttribute = region.contains(focused)
+      ? ['data-sel', 'data-inspect', 'data-slot', 'data-unenter', 'data-tformat', 'data-tsize'].find((a) => focused?.hasAttribute(a))
+      : undefined;
+    const focusValue = focusAttribute ? focused?.getAttribute(focusAttribute) : null;
+    region.innerHTML = html;
+    regions.set(region, html);
+    if (focusAttribute && focusValue) region.querySelector<HTMLElement>(`[${focusAttribute}="${CSS.escape(focusValue)}"]`)?.focus({ preventScroll: true });
+  };
+
   const draw = () => {
     const { picks, slot, focus, detailed, mode } = st;
     const tag = mode === 'tag';
+    const tourney = mode === 'tourney';
+    const role = st.role ?? 'All';
+    screen.className = `select mode-${mode}${screen.classList.contains('p-enter') ? ' p-enter' : ''}`;
+    for (const btn of modeButtons) {
+      const active = btn.dataset.mode === mode;
+      btn.classList.toggle('on', active);
+      btn.setAttribute('aria-selected', String(active));
+    }
+    for (const btn of filterButtons) {
+      const active = btn.dataset.role === role;
+      btn.classList.toggle('on', active);
+      btn.setAttribute('aria-pressed', String(active));
+    }
+    badges.forEach((button, index) => {
+      const d = ROSTER[index];
+      button.hidden = role !== 'All' && role !== d.role;
+      button.classList.toggle('focus', focus.id === d.id);
+      const marks = button.querySelector<HTMLElement>('.marks')!;
+      if (tourney) {
+        const position = st.entrants.indexOf(d);
+        update(marks, position < 0 ? '' : `<i class="mk in">${st.tFormat === 'tag' ? `T${(position >> 1) + 1}` : '✓'}</i>`);
+      } else {
+        update(marks, picks.map((fighter, i) => fighter.id === d.id ?
+          teamOf(st, i) ? '<i class="mk red">R</i>' : '<i class="mk blue">B</i>' : '').join(''));
+      }
+    });
+
     const slotHtml = (i: number) => {
       const d = picks[i];
       const red = teamOf(st, i) === 1;
-      const n = tag ? ` ${(i % 2) + 1}` : '';
+      const group = red ? 'Red' : 'Blue';
       return `<button class="slot ${red ? 'red' : 'blue'} ${tag ? 'small' : ''} ${slot === i ? 'active' : ''}" data-slot="${i}" aria-pressed="${slot === i}">
-        <span class="slot-tag">${red ? 'RED' : 'BLUE'}${n}</span>
+        <span class="slot-tag">${group}${tag ? ` ${i % 2 + 1}` : ''}</span>
         <span class="slot-face">${face(d, 'icon')}</span>
-        <span class="slot-name">${d.name}</span>
-        <span class="slot-role">${d.role}</span>
+        <span class="slot-name">${esc(d.displayName)}</span>
+        <span class="slot-role">${esc(d.name)}</span>
       </button>`;
     };
+    const entrant = (i: number) => {
+      const d = st.entrants[i];
+      return d
+        ? `<button class="ent" data-unenter="${d.id}" title="Remove ${esc(d.displayName)}">${face(d, 'icon')}<span>${esc(d.displayName)}</span></button>`
+        : '<span class="ent empty" aria-label="Open slot">–</span>';
+    };
     const need = jobsNeeded(st);
-    const head = mode === 'tourney'
+    update(setup, tourney
       ? `<div class="t-setup">
           <div class="t-opts">
             <div class="seg" role="group" aria-label="Format">${(['duel', 'tag'] as Format[]).map((f) => `<button data-tformat="${f}" class="${st.tFormat === f ? 'on' : ''}" aria-pressed="${st.tFormat === f}">${f === 'duel' ? '1v1 bracket' : 'Tag Team bracket'}</button>`).join('')}</div>
-            <div class="seg" role="group" aria-label="Bracket size">${SIZES.filter((n) => st.tFormat === 'duel' || n <= 8).map((n) => `<button data-tsize="${n}" class="${st.tSize === n ? 'on' : ''}" aria-pressed="${st.tSize === n}">${n} ${st.tFormat === 'tag' ? 'teams' : 'jobs'}</button>`).join('')}</div>
+            <div class="seg" role="group" aria-label="Bracket size">${SIZES.filter((n) => st.tFormat === 'duel' || n <= 8).map((n) => `<button data-tsize="${n}" class="${st.tSize === n ? 'on' : ''}" aria-pressed="${st.tSize === n}">${n} ${st.tFormat === 'tag' ? 'teams' : 'fighters'}</button>`).join('')}</div>
           </div>
-          <div class="t-entrants" aria-label="Entrants">
-            ${Array.from({ length: need }, (_, i) => {
-              const d = st.entrants[i];
-              const pair = st.tFormat === 'tag' && i % 2 === 1 ? ' pair' : '';
-              return d
-                ? `<button class="ent${pair}" data-unenter="${d.id}" title="Remove ${d.name}">${face(d, 'icon')}<span>${d.name}</span></button>`
-                : `<span class="ent empty${pair}">?</span>`;
-            }).join('')}
-          </div>
+          <div class="t-entrants ${st.tFormat === 'tag' ? 'team-entrants' : ''}" aria-label="Entrants">${st.tFormat === 'tag'
+            ? Array.from({ length: st.tSize }, (_, i) => `<div class="entrant-team" aria-label="Team ${i + 1}">${entrant(i * 2)}${entrant(i * 2 + 1)}</div>`).join('')
+            : Array.from({ length: need }, (_, i) => entrant(i)).join('')}</div>
         </div>`
       : `<div class="sel-head">
           ${tag ? `<div class="team blue">${slotHtml(0)}${slotHtml(1)}</div>` : slotHtml(0)}
-          <div class="vs-mid">VS</div>
+          <div class="vs-mid" aria-hidden="true">VS</div>
           ${tag ? `<div class="team red">${slotHtml(2)}${slotHtml(3)}</div>` : slotHtml(1)}
-        </div>`;
-    const role = st.role ?? 'All';
-    const filters = ROLES.map((r) => `<button class="rf ${r === role ? 'on' : ''}" data-role="${r}" style="--rc:${r === 'All' ? '#2a1d14' : ROLE_COLORS[r]}" aria-pressed="${r === role}">${r}</button>`).join('');
-    const badges = ROSTER.filter((d) => role === 'All' || d.role === role).map((d) => {
-      let marks = '';
-      if (mode === 'tourney') {
-        const k = st.entrants.indexOf(d);
-        if (k >= 0) marks = `<i class="mk in">${st.tFormat === 'tag' ? `T${(k >> 1) + 1}` : '✓'}</i>`;
-      } else {
-        picks.forEach((p, i) => {
-          if (p.id === d.id) marks += `<i class="mk ${teamOf(st, i) ? 'red' : 'blue'}">${teamOf(st, i) ? 'R' : 'B'}</i>`;
-        });
-      }
-      return `<button class="badge ${focus.id === d.id ? 'focus' : ''}" data-pick="${d.id}" style="--rc:${ROLE_COLORS[d.role]}">
-        <span class="strap"></span>
-        <span class="face" style="background:${hex(d.color)}">${face(d, 'icon')}</span>
-        <span class="bname">${d.name}</span>
-        <span class="brole">${d.role}</span>
-        <span class="marks">${marks}</span>
-      </button>`;
-    }).join('');
-    const f = focus;
-    const tabs = (Object.keys(MODE_LABEL) as Mode[]).map((m) => `<button data-mode="${m}" class="${m === mode ? 'on' : ''}" role="tab" aria-selected="${m === mode}">${MODE_LABEL[m]}</button>`).join('');
-    const slotName = tag ? `${teamOf(st, slot) ? 'RED' : 'BLUE'} ${(slot % 2) + 1}` : slot ? 'RED' : 'BLUE';
-    const hint = hintFlash || (mode === 'tourney'
-      ? `${st.entrants.length} / ${need} picked · ${st.entrants.length < need ? 'the rest are drawn at random' : 'bracket full'}${st.tFormat === 'tag' ? ' · picks pair up in order' : ''}`
-      : `Pick ${slotName}: click a badge`);
-    const foot = mode === 'tourney'
-      ? `<button data-sel="tfill">Random fill</button>
-         <button data-sel="tclear">Clear</button>
-         <span class="hint">${hint}</span>
-         <button class="primary big" data-sel="go">Start tournament</button>`
-      : `<button data-sel="rand">Random ${tag ? 'teams' : 'both'}</button>
-         <button data-sel="swap">Swap sides</button>
-         <button data-sel="gacha" class="gacha-toggle ${st.gacha ? 'on' : ''}" aria-pressed="${st.gacha}" title="You draft cards for Blue every 20 s; the CPU drafts for Red">Gacha ${st.gacha ? 'ON' : 'OFF'}</button>
-         <label class="arena-pick">Arena
-           <select data-arena>
-             <option value="auto">Auto</option>
-             ${Object.entries(ARENA_NAMES).map(([id, name]) => `<option value="${id}" ${st.arena === id ? 'selected' : ''}>${esc(name)}</option>`).join('')}
-           </select>
-         </label>
-         <span class="hint">${hint}</span>
-         <button class="primary big" data-sel="go">Fight!</button>`;
-    panel.innerHTML = `
-      <div class="select mode-${mode}">
-        <div class="modes" role="tablist" aria-label="Game mode"><button class="back" data-sel="back" aria-label="Back to the main menu">‹ Menu</button>${tabs}</div>
-        ${head}
-        <div class="sel-body">
-          <div class="pick-col"><div class="filters" role="group" aria-label="Filter by role">${filters}</div><div class="grid">${badges}</div></div>
-          <div class="detail" style="--rc:${ROLE_COLORS[f.role]}">
-            <div class="d-head">
-              <div class="d-face" style="background:${hex(f.color)}">${face(f, 'icon')}</div>
-              <div>
-                <div class="d-name">${f.name} <span class="d-role">${f.role}</span></div>
-                <div class="d-title">${esc(f.title)} · covers ${esc(f.mergedFrom)}</div>
-                <div class="d-quirk">${esc(f.quirk)}</div>
-              </div>
-            </div>
-            ${statBars(f)}
-            <div class="seg" role="group" aria-label="Description detail">
-              <button data-sel="simple" class="${detailed ? '' : 'on'}" aria-pressed="${!detailed}">Simple</button>
-              <button data-sel="detailed" class="${detailed ? 'on' : ''}" aria-pressed="${detailed}">Detailed</button>
-            </div>
-            ${skillBlock('passive', 'PASSIVE', f.passive.name, detailed ? f.passive.detailed : f.passive.simple)}
-            ${skillBlock('active', `ACTIVE · ${f.active.cooldown}s cooldown`, f.active.name, detailed ? f.active.detailed : f.active.simple)}
-            ${skillBlock('special', 'SPECIAL · fires when the rage bar is full', f.special.name, detailed ? f.special.detailed : f.special.simple, `<div class="quote">“${esc(f.special.quote)}”</div>`)}
-          </div>
-        </div>
-        <div class="sel-foot">${foot}</div>
-        <div class="credits">Sound effects: <a href="https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/" target="_blank" rel="noopener">“Oculus Audio Pack 01”</a> by Oculus VR, LLC, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (cut and levelled for this game).</div>
+        </div>`);
+
+    const ability = (kind: SkillKind) => {
+      const move = focus[kind];
+      const meta = kind === 'active' ? `${focus.active.cooldown}s cooldown` : kind === 'special' ? 'Full rage' : 'Always on';
+      return `<div class="skill ${kind}">
+        ${skillIcon(focus.id, kind)}
+        <div class="skill-copy"><div class="skill-tag">${kind} · ${meta}</div>
+        <div class="skill-name">${esc(move.name)}</div><p>${esc(detailed ? move.detailed : move.simple)}</p>
+        ${detailed && kind === 'special' ? `<div class="quote">“${esc(focus.special.quote)}”</div>` : ''}</div>
       </div>`;
-    panel.querySelector<HTMLSelectElement>('[data-arena]')?.addEventListener('change', ({ currentTarget }) => {
-      const { value } = currentTarget as HTMLSelectElement;
-      if (value === 'auto' || isArenaId(value)) st.arena = value;
-    });
+    };
+    const kinds: SkillKind[] = ['passive', 'active', 'special'];
+    detail.style.setProperty('--rc', ROLE_COLORS[focus.role]);
+    update(detail, `<div class="d-head">
+        <div class="d-face" style="background:${hex(focus.color)}">${face(focus, 'icon')}</div>
+        <div><div class="d-name">${esc(focus.displayName)}</div>
+        <div class="d-identity">${esc(focus.name)} <span class="d-role">${focus.role}</span></div></div>
+      </div>
+      <div class="profile-toolbar">
+        <div class="seg" role="group" aria-label="Fighter profile">
+          <button data-sel="skills" class="${profile === 'skills' ? 'on' : ''}" aria-pressed="${profile === 'skills'}">Skills</button>
+          <button data-sel="stats" class="${profile === 'stats' ? 'on' : ''}" aria-pressed="${profile === 'stats'}">Stats</button>
+        </div>
+        ${profile === 'skills' ? `<div class="seg" role="group" aria-label="Description detail">
+          <button data-sel="simple" class="${detailed ? '' : 'on'}" aria-pressed="${!detailed}">Simple</button>
+          <button data-sel="detailed" class="${detailed ? 'on' : ''}" aria-pressed="${detailed}">Detailed</button>
+        </div>` : ''}
+      </div>
+      ${profile === 'stats' ? `<div class="profile-stats">${statBars(focus)}<p class="d-quirk">${esc(focus.quirk)}</p></div>`
+        : detailed ? `<div class="skill-tabs" role="group" aria-label="Choose a skill">${kinds.map((kind) =>
+          `<button data-inspect="${kind}" aria-pressed="${skill === kind}">${kind}</button>`).join('')}</div>${ability(skill)}`
+          : `<div class="skill-list">${kinds.map(ability).join('')}</div>`}
+    `);
+
+    const position = `${teamOf(st, slot) ? 'Red' : 'Blue'}${tag ? ` ${slot % 2 + 1}` : ''}`;
+    const hint = hintFlash || (tourney
+      ? `${st.entrants.length}/${need} selected${st.entrants.length < need ? ' · Empty slots fill at random' : ''}`
+      : `Picking for ${position}`);
+    update(dock, `<div class="setup-tools">${tourney
+      ? '<button data-sel="tfill">Random fill</button><button data-sel="tclear">Clear</button>'
+      : `<button data-sel="rand">Random</button><button data-sel="swap">Swap</button>
+        <button data-sel="gacha" class="gacha-toggle ${st.gacha ? 'on' : ''}" aria-pressed="${st.gacha}" title="Draft cards for Blue every ${GACHA.surgeEvery} seconds">Gacha ${st.gacha ? 'on' : 'off'}</button>
+        <label class="arena-pick">Arena <select data-arena><option value="auto">Auto</option>
+          ${Object.entries(ARENA_NAMES).map(([id, name]) => `<option value="${id}" ${st.arena === id ? 'selected' : ''}>${esc(name)}</option>`).join('')}
+        </select></label>`}</div>
+      <div class="setup-start"><span class="hint" role="status"></span><button class="primary big" data-sel="go">${tourney ? 'Start tournament' : 'Fight!'}</button></div>`);
+    const hintEl = dock.querySelector<HTMLElement>('.hint')!;
+    if (hintEl.textContent !== hint) hintEl.textContent = hint;
     hintFlash = '';
   };
 
-  panel.onclick = (e) => {
-    const t = (e.target as HTMLElement).closest<HTMLElement>('[data-sel],[data-pick],[data-role],[data-mode],[data-slot],[data-tsize],[data-tformat],[data-unenter]');
-    if (!t) return;
-    const d = t.dataset;
+  screen.onchange = (event) => {
+    const select = event.target as HTMLSelectElement;
+    if (select.matches('[data-arena]') && (select.value === 'auto' || isArenaId(select.value))) st.arena = select.value;
+  };
+
+  panel.onclick = (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-sel],[data-pick],[data-role],[data-mode],[data-slot],[data-tsize],[data-tformat],[data-unenter],[data-inspect]');
+    if (!target || !screen.contains(target)) return;
+    const d = target.dataset;
     if (d.role) st.role = d.role as Role | 'All';
     else if (d.mode) {
       setMode(st, d.mode as Mode);
       onMode?.(st.mode);
-    } else if (d.slot) {
+    } else if (d.slot !== undefined) {
       st.slot = Number(d.slot);
       st.focus = st.picks[st.slot];
-    } else if (d.tsize) {
+    } else if (d.inspect) skill = d.inspect as SkillKind;
+    else if (d.tsize) {
       st.tSize = Number(d.tsize);
       st.entrants = st.entrants.slice(0, jobsNeeded(st));
     } else if (d.tformat) {
@@ -241,13 +300,17 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
       if (st.mode === 'tourney') {
         if (st.entrants.includes(job)) st.entrants = st.entrants.filter((x) => x !== job);
         else if (st.entrants.length < jobsNeeded(st)) st.entrants.push(job);
-        else hintFlash = 'The bracket is full: remove someone first';
+        else hintFlash = 'Bracket full. Remove a fighter first.';
       } else {
         st.picks[st.slot] = job;
         st.slot = (st.slot + 1) % st.picks.length;
       }
-    } else
+    } else {
       switch (d.sel) {
+        case 'skills':
+        case 'stats':
+          profile = d.sel;
+          break;
         case 'simple':
         case 'detailed':
           st.detailed = d.sel === 'detailed';
@@ -268,7 +331,7 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
           break;
         case 'back':
           panel.onclick = null;
-          onGo({ mode: 'menu' } as never);
+          onGo({ mode: 'menu' });
           return;
         case 'tfill':
           st.entrants = randomJobs(jobsNeeded(st), st.entrants);
@@ -282,13 +345,14 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
           else onGo({ mode: st.mode, picks: st.picks.slice(), gacha: st.gacha, arena: st.arena });
           return;
       }
+    }
     draw();
   };
   draw();
   panel.classList.add('show', 'wide');
 }
 
-export const teamName = (fs: { def: FighterDef }[]) => fs.map((f) => f.def.name).join(' & ');
+export const teamName = (fs: { def: FighterDef }[]) => fs.map((f) => f.def.displayName).join(' & ');
 
 export function renderResults(panel: HTMLElement, sim: Sim, teamHex: string[], opts: { tourney?: string; actions?: string; names?: [string, string] } = {}) {
   const w = sim.winner;
@@ -316,7 +380,7 @@ export function renderResults(panel: HTMLElement, sim: Sim, teamHex: string[], o
       <div class="head"><span>${opts.tourney ? `${esc(opts.tourney.toUpperCase())} · ` : ''}MATCH REPORT · SEED ${sim.seed}</span><span>${sim.t.toFixed(1)}s</span></div>
       <h1>${title} <span class="stamp">${winners.length ? 'Approved' : 'Tie'}</span></h1>
       <table>
-        <tr><th></th>${fs.map((f) => `<th style="color:${teamHex[f.team]}">${f.def.name}</th>`).join('')}</tr>
+        <tr><th></th>${fs.map((f) => `<th style="color:${teamHex[f.team]}" title="${esc(f.def.role)}">${esc(f.def.displayName)}<br>${esc(f.def.name)}</th>`).join('')}</tr>
         ${rows.map(([k, fn]) => `<tr><td>${k}</td>${fs.map((f) => `<td>${fn(f)}</td>`).join('')}</tr>`).join('')}
         ${cardsRow}
       </table>

@@ -54,6 +54,28 @@ describe('authoritative room', () => {
     expect(room.pick).toBe(1);
   });
 
+  it('restores accepted rerolls during a draft and resets the allowance at the next draft', () => {
+    const room = locked('gacha1');
+    room.seed = 21;
+    for (const reroll of [1, 2]) {
+      expect(room.act(1, { t: 'reroll', reroll, pick: 0, match: 1 }, now)).toBe(true);
+    }
+    const restored = Room.restore(JSON.parse(JSON.stringify(room)));
+    expect(restored.view(1).rerolls).toBe(2);
+    expect(restored.act(1, { t: 'reroll', reroll: 3, pick: 0, match: 1 }, now)).toBe(false);
+    const jobs = [byId('nurse')!];
+    const initial = offersFor(room.seed, 1, 0, 0, jobs, [])[0].id;
+    const discarded = offersFor(room.seed, 1, 0, 1, jobs, [])[0].id;
+    const current = offersFor(room.seed, 1, 0, 2, jobs, [])[0].id;
+    expect(restored.act(1, { t: 'card', id: initial, reroll: 0, pick: 0, match: 1 }, now)).toBe(false);
+    expect(restored.act(1, { t: 'card', id: discarded, reroll: 2, pick: 0, match: 1 }, now)).toBe(false);
+    expect(restored.act(1, { t: 'card', id: current, reroll: 2, pick: 0, match: 1 }, now)).toBe(true);
+    restored.elapse(restored.alarmAt);
+    restored.elapse(restored.alarmAt);
+    expect(restored.view(1)).toMatchObject({ phase: 'draft', pick: 1, rerolls: 0 });
+    expect(restored.act(1, { t: 'reroll', reroll: 1, pick: 1, match: 1 }, restored.at - 1)).toBe(true);
+  });
+
   it('replays a disputed result using the confirmed log', () => {
     const room = locked();
     const view = room.view(0);
@@ -97,14 +119,15 @@ describe('authoritative room', () => {
   });
 
   it('detects a Gacha knockout at an unreported surge boundary', () => {
-    const room = locked('gacha1', 'firefighter');
-    room.seed = 21;
+    const room = locked('gacha1', 'builder');
+    room.seed = 2;
     for (let phase = 0; phase < 18 && room.phase !== 'result'; phase++) {
       room.elapse(room.alarmAt);
     }
     expect(room.phase).toBe('result');
     expect(room.pick).toBeLessThan(8);
-    expect(room.result?.winner).not.toBeNull();
+    expect(room.result?.tick).toBeLessThan(room.boundary);
+    expect(room.result?.winner).toBe(0);
   });
 
 });

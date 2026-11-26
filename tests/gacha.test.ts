@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, CARDS, CLASS_CARDS, GACHA, JOB_CARDS, augOf } from '../src/data/cards';
+import { ALL_CARDS, CARD_BY_ID, CARDS, CLASS_CARDS, GACHA, JOB_CARDS, augOf } from '../src/data/cards';
 import { ROSTER, byId } from '../src/data/roster';
 import { offersFor, poolFor, replayGacha, runGacha } from '../src/modes/gacha';
 import { LEVELS, STARTERS, judge } from '../src/modes/story';
@@ -43,6 +43,25 @@ describe('cards', () => {
     expect(offersFor(5, 0, 2, 1, team, []).map((c) => c.id)).not.toEqual(offersFor(5, 0, 2, 0, team, []).map((c) => c.id)); // a reroll changes them
   });
 
+  it('uses a single shared rarity throughout each draft round', () => {
+    const jobs = [[def('nurse')], [def('miner'), def('chef')]];
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 12; seed++) {
+      for (let pick = 0; pick < 9; pick++) {
+        const batches = ([0, 1] as const).flatMap((team) =>
+          [0, 1, 2].map((reroll) => offersFor(seed, team, pick, reroll, jobs[team], ['hard-hat'])),
+        );
+        const rarity = batches[0][0].rarity;
+        expect(batches.every((batch) => batch.length === 3 && batch.every((card) => card.rarity === rarity))).toBe(true);
+        seen.add(rarity);
+        for (const i of [1, 2, 4, 5]) {
+          expect(batches[i].every((card) => !batches[i - 1].includes(card))).toBe(true);
+        }
+      }
+    }
+    expect([...seen].sort()).toEqual(['common', 'epic', 'rare']);
+  });
+
   it('the art sheet covers every card plus the effects', () => {
     expect(CARD_ART_NAMES.slice(0, ALL_CARDS.length)).toEqual(ALL_CARDS.map((c) => c.id));
     expect(CARD_ART_NAMES.length).toBeLessThanOrEqual(90);
@@ -50,12 +69,15 @@ describe('cards', () => {
 });
 
 describe('gacha matches', () => {
-  it('pause for a pick every 20 s and replay identically from their draft log', { timeout: 30000 }, () => {
+  it('pause for a pick every 15 s and replay identically from their draft log', { timeout: 30000 }, () => {
     for (let s = 0; s < 4; s++) {
       const teams: [any[], any[]] = s % 2 ? [[def('miner'), def('nurse')], [def('pilot'), def('chef')]] : [[def('lawyer')], [def('athlete')]];
       const { sim, log } = runGacha(teams, 300 + s);
       const picksEach = log.filter((p) => p.team === 0).length;
-      expect(picksEach).toBe(1 + Math.floor(Math.min(sim.t, GACHA.timeLimit - 1e-9) / GACHA.surgeEvery));
+      expect(picksEach).toBe(1 + Math.floor(Math.min(sim.t, GACHA.timeLimit - 1e-9) / 15));
+      for (let pick = 0; pick < picksEach; pick++) {
+        expect(new Set(log.filter((p) => p.pick === pick).map((p) => CARD_BY_ID.get(p.id)?.rarity)).size).toBe(1);
+      }
       const again = replayGacha(teams, 300 + s, log);
       expect(again.tick).toBe(sim.tick);
       expect(again.winner).toBe(sim.winner);

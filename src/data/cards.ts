@@ -1,7 +1,7 @@
 /**
  * Gacha cards: 45 general buffs (15 common, 15 rare, 15 epic) plus exclusives: one per class
  * (role) and one per job, offered only to a team that has that class or job. Modelled on Mobile
- * Legends' Chaos mode: pick 1 of 3 every 20 s, rarer cards turn up more as the match goes on.
+ * Legends' Chaos mode: pick 1 of 3 every 15 s, rarer cards turn up more as the match goes on.
  * A card is pure data: numbers merged into a fighter's augment profile (Aug below), which the sim
  * reads at its hook points. Cards apply to the whole team.
  */
@@ -191,7 +191,6 @@ export const PICK_ODDS: [common: number, rare: number, epic: number][] = [
 export const oddsFor = (pick: number) => PICK_ODDS[Math.min(pick, PICK_ODDS.length - 1)];
 
 /**
- * Gacha match settings: a pick before the fight, then the fight pauses for a pick every 20 s.
- * HP is raised so a match lasts about 2–3 minutes (6–9 picks a side).
+ * Gacha starts with a draft and pauses every 15 s of combat for another.
  */
-export const GACHA = { hpMul: 4.2, timeLimit: 180, surgeEvery: 20, overtimeAt: 100, rerolls: 2, offers: 3, exclusiveWeight: 3 };
+export const GACHA = { hpMul: 4.5, timeLimit: 150, surgeEvery: 15, overtimeAt: 100, rerolls: 2, offers: 3, exclusiveWeight: 3 };

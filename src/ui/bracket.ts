@@ -20,10 +20,10 @@ export interface BracketActions {
 export function renderBracket(panel: HTMLElement, t: Tournament, byId: (id: string) => FighterDef, act: BracketActions) {
   const next = nextMatch(t);
   const champ = champion(t);
-  const name = (e: Entry) => e.map((id) => byId(id).name).join(' & ');
+  const name = (e: Entry) => e.map((id) => byId(id).displayName).join(' & ');
   const faces = (e: Entry) => e.map((id) => {
     const d = byId(id);
-    return `<span class="bf" style="background:${hex(d.color)}">${face(d, 'icon')}</span>`;
+    return `<span class="bf" title="${d.displayName} · ${d.name} · ${d.role}" style="background:${hex(d.color)}">${face(d, 'icon')}</span>`;
   }).join('');
   const side = (m: Match, k: 0 | 1) => {
     const e = k === 0 ? m.a : m.b;

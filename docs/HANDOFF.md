@@ -41,7 +41,7 @@ reference.
 |---|---|
 | Combat simulation | Done. Deterministic 60 Hz sim, 30 jobs with unique kits, 27 status effects, rage-bar specials. |
 | Modes | Done: CPU Battle (1v1, Tag Team 2v2, Tournament, optional Gacha), Player vs Player (4 modes, online), Story (24 levels). |
-| Gacha (card draft) | Done. 82 cards, pick every 20 s, overtime, own balance layer. |
+| Gacha (card draft) | Done. 82 cards, pick every 15 s, overtime, own balance layer. |
 | Online PvP | Done (peer-to-peer). Verified with two browser tabs; not yet tested across two real devices/networks. |
 | MMR / ranks | Done, stored per browser (not tamper-proof; see §13). |
 | Art | Done: 30 characters (body, arm+tool, bust, icon), 1 arena, 30 props, 82 card icons + 8 card effects, 2 posters, 20 UI emblems. |
@@ -231,14 +231,15 @@ card is added mid-fight. Cards apply to the whole team.
 
 - 45 general cards (15 common, 15 rare, 15 epic), 7 class cards (one per role, rare), 30 job cards (one per job,
   epic). Exclusive cards are only offered to a team with that class/job, and are weighted ×3 when eligible.
-- Draft: pick 1 of 3 before the fight, then every 20 s (`surgeEvery`) the sim pauses (`paused`, `surge` event) until
-  every side has picked. Rarity odds rise per pick (`PICK_ODDS`). 2 rerolls per match; 25 s / 12 s pick timers
-  (auto-pick at random). CPU picks at random, seeded.
-- Offers are a pure function of (seed, team, pick, rerolls, jobs, owned), so PvP never sends offers, only choices.
+- Draft: pick 1 of 3 before the fight, then every 15 s (`surgeEvery`) the sim pauses (`paused`, `surge` event) until
+  every side has picked. Rarity is rolled once per round from the match seed and draft number (`PICK_ODDS`).
+  Both sides share that rarity through two rerolls each round. Pick timers are 25 s before combat and
+  12 s during combat. CPU picks at random, seeded.
+- Offers are a pure function of (seed, team, pick, rerolls, jobs, owned), so PvP sends choices and reroll counts.
 
 ### 5.7 Gacha match rules
 
-×4.2 HP, 3:00 limit, **overtime** from 1:40 (+25 % damage per 10 s, healing ×0.4). A time-out is decided on HP %.
+×4.5 HP, 2:30 limit, **overtime** from 1:40 (+25 % damage per 10 s, healing ×0.4). A time-out is decided on HP %.
 Gacha uses its own job-balance layer.
 
 ### 5.8 Tag Team
@@ -313,7 +314,7 @@ sample sizes, so differences under ~5 % are not actionable.
 1. Change the kit/stat/card.
 2. `npm test` (catches broken determinism and texts).
 3. `npm run tune` → `npm run tune:tag` → `npm run tune:gacha` (in that order; each layer sits on the previous).
-4. Check with `simstats`, `tagstats`, `gachastats`. Keep fights 30–45 s (classic) and 2–3 min (Gacha).
+4. Check with `simstats`, `tagstats`, `gachastats`. Keep fights 30–45 s (classic) and about 2 min of combat (Gacha).
 5. If a card is an outlier, adjust its numbers in `cards.ts` and update its `detailed` text to match.
 
 ---
@@ -566,7 +567,7 @@ level options), card synergies display, a codex of all 82 cards, collection trac
 | Art source | Generated manually in ChatGPT from prompt packs; processed by our pipeline |
 | Layouts | Landscape 16:9 and portrait (device shape) |
 | Specials | Rage bar (was: once at ≤ 30 % HP) |
-| Gacha | Pick every 20 s, 2–3 min matches, 45 general + class + job cards, CPU picks randomly |
+| Gacha | Pick every 15 s, about two minutes of combat, 45 general + class + job cards, CPU picks randomly |
 | PvP networking | PeerJS P2P lockstep (chosen over Vercel + Upstash and local-only) |
 | MMR | Elo with job-title ranks, client-side |
 | Voice lines | None (ElevenLabs pipeline built, then removed by decision) |

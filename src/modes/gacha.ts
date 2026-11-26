@@ -6,8 +6,8 @@ import { GACHA_BALANCE } from '../data/gachaBalance';
 
 /**
  * The Gacha draft: before the fight each side picks 1 of 3 cards, then the fight pauses every
- * 20 s for another pick. Offers are generated from (seed, team, pick, reroll), so both players'
- * machines in online PvP produce identical offers without sending them; only the choices travel.
+ * 15 s for another pick. Each round rolls one rarity shared by both teams. Online PvP
+ * generates the choices deterministically, so only the picks travel.
  */
 
 const mix = (...n: number[]) => n.reduce((h, x) => (Math.imul(h ^ (x + 0x9e3779b9), 0x85ebca6b) ^ (h >>> 13)) >>> 0, 2166136261);
@@ -21,28 +21,26 @@ export function poolFor(jobs: FighterDef[]): Card[] {
 
 /** The `offers` cards for a team's pick #`pick` (0 = pre-fight), after `reroll` rerolls. */
 export function offersFor(seed: number, team: Team, pick: number, reroll: number, jobs: FighterDef[], owned: readonly string[]): Card[] {
-  const rng = new Rng(mix(seed, team, pick, reroll));
-  const pool = poolFor(jobs).filter((c) => !owned.includes(c.id));
-  const odds = oddsFor(pick);
-  const out: Card[] = [];
-  for (let i = 0; i < GACHA.offers && pool.length; i++) {
-    const roll = rng.next();
-    let want: Rarity = roll < odds[0] ? 'common' : roll < odds[0] + odds[1] ? 'rare' : 'epic';
-    let opts = pool.filter((c) => c.rarity === want && !out.includes(c));
-    // nothing left at that rarity: step to the nearest one that has cards
-    for (const alt of ['rare', 'epic', 'common'] as Rarity[]) {
-      if (opts.length) break;
-      want = alt;
-      opts = pool.filter((c) => c.rarity === alt && !out.includes(c));
+  const [common, rare] = oddsFor(pick);
+  const roll = new Rng(mix(seed, pick, 99)).next();
+  const rarity: Rarity = roll < common ? 'common' : roll < common + rare ? 'rare' : 'epic';
+  const pool = poolFor(jobs).filter((c) => c.rarity === rarity && !owned.includes(c.id));
+  let previous: Card[] = [];
+  for (let attempt = 0; attempt <= reroll; attempt++) {
+    const rng = new Rng(mix(seed, team, pick, attempt));
+    const fresh = pool.filter((c) => !previous.includes(c));
+    const opts = fresh.length >= GACHA.offers ? fresh : pool.slice();
+    const offers: Card[] = [];
+    while (offers.length < GACHA.offers && opts.length) {
+      const weights = opts.map((c) => (c.job || c.role ? GACHA.exclusiveWeight : 1));
+      let roll = rng.next() * weights.reduce((sum, weight) => sum + weight, 0);
+      let index = 0;
+      while (index < opts.length - 1 && (roll -= weights[index]) >= 0) index++;
+      offers.push(opts.splice(index, 1)[0]);
     }
-    if (!opts.length) break;
-    const w = opts.map((c) => (c.job || c.role ? GACHA.exclusiveWeight : 1));
-    let r = rng.next() * w.reduce((a, b) => a + b, 0);
-    let k = 0;
-    while (k < opts.length - 1 && (r -= w[k]) > 0) k++;
-    out.push(opts[k]);
+    previous = offers;
   }
-  return out;
+  return previous;
 }
 
 /** The CPU picks at random (as the design asks), but reproducibly from the seed. */

@@ -37,7 +37,7 @@ export class Cutscene {
     this.el.querySelector('.cs-bust')!.innerHTML = face(def, 'bust', true);
     this.el.querySelector('.cs-name')!.textContent = def.special.name;
     this.el.querySelector('.cs-quote')!.textContent = `“${def.special.quote}”`;
-    this.el.querySelector('.cs-kicker')!.textContent = `${def.name.toUpperCase()} · SPECIAL MOVE`;
+    this.el.querySelector('.cs-kicker')!.textContent = `${def.displayName.toUpperCase()} · ${def.name.toUpperCase()} · SPECIAL MOVE`;
     this.el.className = '';
     void this.el.offsetWidth;
     this.el.className = `show ${side === 1 ? 'right' : 'left'}`;

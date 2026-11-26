@@ -13,39 +13,29 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&family=Special+Elite&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/ui/styles.css" />
+    <link rel="stylesheet" href="/src/ui/roster.css" />
   </head>
   <body>
     <!-- boot loader: inline so it paints before any script or stylesheet arrives -->
-    <div id="boot" role="status" aria-live="polite">
+    <div id="boot">
       <style>
-        #boot { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 35%, #3a2b20 0%, #17130f 70%); color: #f2efe6; font-family: system-ui, sans-serif; transition: opacity .5s ease, visibility .5s; }
+        #boot { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #362a20, #161410 72%); color: #f2efe6; transition: opacity .22s ease, visibility .22s; }
         #boot.done { opacity: 0; visibility: hidden; }
-        #boot .bt { display: flex; flex-direction: column; align-items: center; gap: 18px; width: min(420px, 84vw); }
-        #boot .lan { width: 10px; height: 70px; background: linear-gradient(#d9452b, #a3291c); border-radius: 3px; margin-bottom: -8px; }
-        #boot .badge { width: 120px; height: 160px; background: #f2efe6; border: 5px solid #2a1d14; border-radius: 14px; transform-origin: 50% -70px; animation: bswing 1.6s ease-in-out infinite; box-shadow: 0 8px 0 rgba(0,0,0,.35); position: relative; overflow: hidden; }
-        #boot .badge::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 26px; background: #d9452b; border-bottom: 4px solid #2a1d14; }
-        #boot .badge::after { content: ''; position: absolute; left: 50%; top: 9px; width: 30px; height: 8px; margin-left: -15px; background: #2a1d14; border-radius: 4px; }
-        #boot .ph { position: absolute; left: 22px; top: 42px; width: 76px; height: 70px; border-radius: 8px; border: 4px solid #2a1d14; background: #ffd23f; overflow: hidden; }
-        #boot .ph i { position: absolute; left: 50%; bottom: -14px; width: 56px; height: 56px; margin-left: -28px; border-radius: 50% 50% 0 0; background: #2a1d14; }
-        #boot .ph b { position: absolute; left: 50%; top: 10px; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: #2a1d14; }
-        #boot .ln { position: absolute; left: 22px; right: 22px; height: 7px; border-radius: 4px; background: #c9bfa9; }
-        #boot .l1 { top: 124px; } #boot .l2 { top: 138px; right: 46px; }
-        #boot h1 { margin: 6px 0 0; font: 400 54px/1 'Lilita One', 'Arial Black', sans-serif; letter-spacing: 2px; color: #ffd23f; -webkit-text-stroke: 3px #2a1d14; paint-order: stroke fill; text-shadow: 0 5px 0 #2a1d14; }
-        #boot h1 span { color: #ff5a46; }
-        #boot .bar { width: 100%; height: 16px; border: 3px solid #2a1d14; border-radius: 10px; background: #4a3a2e; overflow: hidden; }
-        #boot .fill { height: 100%; width: 4%; background: linear-gradient(90deg, #ffd23f, #ff8a2a); transition: width .25s ease; box-shadow: inset 0 -4px 0 rgba(0,0,0,.18); }
-        #boot .row { width: 100%; display: flex; justify-content: space-between; font: 12px/1.4 'Special Elite', monospace; opacity: .8; }
-        #boot .tip { min-height: 2.8em; text-align: center; font: 600 14px/1.4 'Nunito', system-ui, sans-serif; opacity: .9; transition: opacity .3s; }
-        @keyframes bswing { 0%, 100% { transform: rotate(-7deg) } 50% { transform: rotate(7deg) } }
-        @media (prefers-reduced-motion: reduce) { #boot .badge { animation: none } }
+        #boot .bt { display: grid; justify-items: center; gap: 12px; width: min(220px, 76vw); }
+        #boot .boot-emblem { display: block; width: 112px; height: 112px; object-fit: contain; }
+        #boot h1 { margin: 0 0 8px; font: 400 40px/1 'Lilita One', 'Arial Black', sans-serif; letter-spacing: 1px; color: #ffd23f; text-shadow: 0 3px #20170f; white-space: nowrap; }
+        #boot h1 span { color: #fa7354; }
+        #boot .bar { width: 100%; height: 5px; border-radius: 4px; background: #5d4b38; overflow: hidden; }
+        #boot .fill { height: 100%; width: 0; border-radius: inherit; background: #ffd23f; transition: width .2s ease; }
+        #boot .row { width: 100%; display: flex; justify-content: space-between; gap: 6px; font: 600 13px/1.4 'Nunito', system-ui, sans-serif; }
+        #boot .pct { font-variant-numeric: tabular-nums; }
+        @media (prefers-reduced-motion: reduce) { #boot, #boot .fill { transition: none; } }
       </style>
       <div class="bt">
-        <div class="lan"></div>
-        <div class="badge"><div class="ph"><b></b><i></i></div><div class="ln l1"></div><div class="ln l2"></div></div>
+        <img class="boot-emblem" src="/art/ui/boot-emblem.webp" alt="" width="112" height="112" fetchpriority="high" />
         <h1>JOB <span>WARS</span></h1>
-        <div class="bar"><div class="fill"></div></div>
-        <div class="row"><span class="what">Clocking in…</span><span class="pct">0%</span></div>
-        <div class="tip"></div>
+        <div class="bar" aria-hidden="true"><div class="fill"></div></div>
+        <div class="row"><span class="what" role="status">Loading…</span><span class="pct" aria-hidden="true">0%</span></div>
       </div>
     </div>
     <div id="stage">
@@ -62,22 +52,25 @@
       <div id="callout"></div>
       <div id="replay"><div class="rp-tag"><i></i>REPLAY</div><button class="rp-skip" data-act="skipreplay">Skip replay ›</button></div>
       <div id="panel"></div>
-      <div id="controls">
-        <div class="buttons">
+      <nav id="controls" aria-label="Fight controls">
+        <div class="fight-group" role="group" aria-label="Match">
+          <button data-act="menu">Menu</button>
           <button data-act="select" title="Choose fighters (F)">Fighters</button>
           <button data-act="new" title="Rematch, new seed (R)">Rematch</button>
-          <button data-act="replay" title="Replay same seed (T)">Replay</button>
-          <button data-act="share" title="Copy a link to this exact fight (K)">Share</button>
-          <button data-act="buffs" class="cards-btn" title="Both sides' cards (B)">Cards</button>
-          <button data-act="menu" title="Main menu (Esc)">Menu</button>
-          <button data-act="pause" title="Pause (Space)">Pause</button>
-          <button data-act="speed" title="Speed (S)">1×</button>
-          <button data-act="juice" title="Toggle game feel (J)" class="on">Juice on</button>
-          <button data-act="sound" title="Sound (M)" class="on">Sound on</button>
-          <button data-act="cutscene" title="Cutscenes (C)">Cutscenes: full</button>
-          <button data-act="layout" title="Layout (L)">Layout: auto</button>
         </div>
-      </div>
+        <div class="fight-group" role="group" aria-label="Playback">
+          <button data-act="buffs" class="cards-btn" title="Both sides' cards (B)">Cards</button>
+          <button data-act="pause" title="Pause (Space)">Pause</button>
+          <button data-act="speed" title="Playback speed (S)">1×</button>
+          <details class="fight-more">
+            <summary>More</summary>
+            <div>
+              <button data-act="replay" title="Replay same seed (T)">Replay</button>
+              <button data-act="share" title="Copy a link to this exact fight (K)">Share</button>
+            </div>
+          </details>
+        </div>
+      </nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

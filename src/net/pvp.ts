@@ -1,8 +1,9 @@
 import Peer, { type DataConnection } from 'peerjs';
-import { ROSTER, byId } from '../data/roster';
-import { ALL_CARDS, CARD_BY_ID } from '../data/cards';
+import { byId } from '../data/roster';
+import { CARD_BY_ID, GACHA } from '../data/cards';
 import { pvpIceConfig } from './ice';
 import { PVP_MODES, type PvpMode } from './pvpModes';
+import { ROOM_RULES } from './roomVersion';
 export { PVP_MODES, type PvpMode } from './pvpModes';
 
 /**
@@ -15,15 +16,13 @@ export { PVP_MODES, type PvpMode } from './pvpModes';
  *  - Quick match: a handful of shared "waiting room" ids per mode and rank tier. Join one that
  *    has someone waiting, or claim a free one and wait. Widens to all tiers after a while.
  */
-/** Both sides must run the same rules: roster and card list must match. */
-const sig = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7).toString(36);
-export const PROTOCOL = `jw2-${sig(ROSTER.map((d) => `${d.id}${d.hp}${d.atk}`).join() + ALL_CARDS.map((c) => c.id).join())}`;
+export const PROTOCOL = `jw3-${ROOM_RULES}`;
 
 export type Msg =
   | { t: 'hello'; v: string; mmr: number; mode: PvpMode }
   | { t: 'picks'; ids: string[] }
   | { t: 'start'; seed: number }
-  | { t: 'card'; team: number; pick: number; id: string }
+  | { t: 'card'; team: number; pick: number; reroll: number; id: string }
   | { t: 'result'; winner: number; hash: string }
   | { t: 'rematch' }
   | { t: 'bye' };
@@ -41,7 +40,8 @@ function validMessage(value: unknown, mode: PvpMode): value is Msg {
     case 'start':
       return Number.isSafeInteger(m.seed);
     case 'card':
-      return (m.team === 0 || m.team === 1) && Number.isSafeInteger(m.pick) && m.pick >= 0 && CARD_BY_ID.has(m.id);
+      return PVP_MODES[mode].gacha && (m.team === 0 || m.team === 1) && Number.isSafeInteger(m.pick) && m.pick >= 0
+        && Number.isSafeInteger(m.reroll) && m.reroll >= 0 && m.reroll <= GACHA.rerolls && CARD_BY_ID.has(m.id);
     case 'result':
       return (m.winner === -1 || m.winner === 0 || m.winner === 1)
         && typeof m.hash === 'string' && m.hash.length <= 128;
