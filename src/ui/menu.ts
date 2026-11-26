@@ -34,6 +34,7 @@ function show(panel: HTMLElement, html: string, onClick: (t: HTMLElement) => voi
   const previous = focused instanceof HTMLButtonElement && panel.contains(focused) ? focused.dataset : null;
   const surface = panel.firstElementChild?.classList[0];
   const rosterScroll = panel.querySelector<HTMLElement>('.roster-scroll')?.scrollTop ?? 0;
+  const lobbyScroll = panel.querySelector<HTMLElement>('.royale-desk')?.scrollTop ?? 0;
   panel.innerHTML = html;
   panel.onclick = (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-m]');
@@ -43,6 +44,8 @@ function show(panel: HTMLElement, html: string, onClick: (t: HTMLElement) => voi
   if (surface !== panel.firstElementChild?.classList[0]) return;
   const roster = panel.querySelector<HTMLElement>('.roster-scroll');
   if (roster) roster.scrollTop = rosterScroll;
+  const lobby = panel.querySelector<HTMLElement>('.royale-desk');
+  if (lobby) lobby.scrollTop = lobbyScroll;
   if (previous) {
     [...panel.querySelectorAll<HTMLButtonElement>('button[data-m]:enabled')].find((button) =>
       button.dataset.m === previous.m && button.dataset.v === previous.v)?.focus({ preventScroll: true });
@@ -341,7 +344,7 @@ export function renderRoyaleLobby(panel: HTMLElement, view: RoomView, code: stri
       <header class="desk-head">
         <button class="back" data-m="leave">Leave</button><h2>${PVP_MODES[view.mode].name}</h2>
       </header>
-      <div class="desk-sheet royale-desk">
+      <div class="desk-sheet royale-desk" role="region" aria-label="Battle Royale lobby" tabindex="0">
         <section class="royale-seats">
           <div class="lobby-code">Invite code <b>${esc(code)}</b><button data-m="copycode">Copy</button></div>
           <ol aria-label="Lobby seats">${occupied.map((taken, i) => `

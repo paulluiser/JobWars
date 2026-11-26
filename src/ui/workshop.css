@@ -783,7 +783,10 @@ body.portrait { background: var(--bg); }
   }
 }
 
-.royale-lobby { height: 100%; }
+#panel.wide:has(> .royale-lobby) { grid-template-rows: minmax(0, 1fr); }
+.royale-lobby { height: 100%; min-height: 0; }
+.royale-lobby .brief-footer { flex-wrap: wrap; justify-content: space-between; gap: 5px 10px; }
+.royale-lobby .brief-footer [role='status'] { min-width: 0; overflow-wrap: anywhere; }
 .royale-desk { display: grid; flex: 1; grid-template-columns: minmax(190px, 1fr) minmax(0, 3fr); }
 .royale-seats, .royale-picks { min-width: 0; padding: var(--desk-gap); }
 .royale-seats { background: var(--desk-inset); }
@@ -793,7 +796,7 @@ body.portrait { background: var(--bg); }
 .royale-seats li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--desk-line); }
 .royale-seats li span { color: var(--desk-text); }
 .royale-picks { display: flex; flex-direction: column; min-height: 120px; }
-.royale-picks .mini-grid { margin-top: 8px; grid-auto-rows: max-content; }
+.royale-picks .mini-grid { max-height: clamp(130px, 43dvh, 480px); grid-auto-rows: max-content; }
 .royale-picks .badge .face { flex: none; width: clamp(25px, 4cqw, 50px); height: auto; aspect-ratio: 1; }
 .royale-picks .badge .bname { font-size: clamp(12px, 1.2cqw, 17px); }
 .royale-picks .badge .brole { font-size: clamp(10px, .85cqw, 13px); line-height: 1.1; }
@@ -845,10 +848,9 @@ body.royale #seed, body.royale #controls [data-act="share"] { display: none; }
 .dr-owned:not(.rival):last-child { grid-column: 1 / -1; }
 body.royale .card-wide { width: min(95%, 760px); overflow: auto; max-height: 94%; }
 
-body.portrait .royale-desk { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+body.portrait .royale-desk { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; }
 body.portrait .royale-seats ol { display: flex; gap: 4px; flex-wrap: wrap; }
 body.portrait .royale-seats li { flex: 1 1 54px; flex-direction: column; gap: 2px; text-align: center; font-size: 11px; padding: 2px; }
-body.portrait .royale-picks .mini-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
 body.portrait #royale-hud { inset: 6px 3% auto; flex-wrap: wrap; }
 body.portrait .royale-banner.banner { width: 30%; }
 body.portrait #royale-hud .hpnum { display: none; }
@@ -910,7 +912,7 @@ body.portrait.royale .clock { top: 115px; }
 body.portrait .pvp-pick .pick-status [role='status'] { margin-left: 0; }
 body.portrait .hero-picker { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(145px, 1fr) auto; }
 body.portrait .hero-picker .mini-grid { grid-template-columns: repeat(auto-fill, minmax(57px, 1fr)); }
-body.portrait .royale-desk { grid-template-rows: auto minmax(min-content, 1fr); }
+body.portrait .royale-picks.hero-picker { grid-template-rows: auto auto; }
 .banner .player-label {
   display: block; max-width: 100%; margin: 1px 0 0; overflow: hidden; text-overflow: ellipsis;
   font: 800 clamp(10px, 1.05cqw, 14px)/1.15 var(--ui); white-space: nowrap;
