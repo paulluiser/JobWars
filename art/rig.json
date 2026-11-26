@@ -1,0 +1,402 @@
+{
+  "chef": {
+    "height": 132,
+    "shoulder": {
+      "x": 17,
+      "y": -54
+    },
+    "weaponLength": 80,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "firefighter": {
+    "height": 132,
+    "shoulder": {
+      "x": 22,
+      "y": -60
+    },
+    "weaponLength": 78,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "fisher": {
+    "height": 132,
+    "shoulder": {
+      "x": 16,
+      "y": -57
+    },
+    "weaponLength": 120,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "arenas": {
+    "market": {
+      "floor": {
+        "x": 0.1,
+        "y": 0.22,
+        "w": 0.8,
+        "h": 0.58
+      }
+    }
+  },
+  "musician": {
+    "height": 132,
+    "shoulder": {
+      "x": 16,
+      "y": -61
+    },
+    "weaponLength": 108,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.08,
+      "y": 0.61
+    }
+  },
+  "accountant": {
+    "height": 132,
+    "shoulder": {
+      "x": 14,
+      "y": -60
+    },
+    "weaponLength": 69,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "artist": {
+    "height": 132,
+    "shoulder": {
+      "x": 18,
+      "y": -58
+    },
+    "weaponLength": 76,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "athlete": {
+    "height": 132,
+    "shoulder": {
+      "x": 19,
+      "y": -61
+    },
+    "weaponLength": 76,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "barber": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -61
+    },
+    "weaponLength": 76,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "builder": {
+    "height": 132,
+    "shoulder": {
+      "x": 11,
+      "y": -62
+    },
+    "weaponLength": 71,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "cleaner": {
+    "height": 132,
+    "shoulder": {
+      "x": 14,
+      "y": -67
+    },
+    "weaponLength": 80,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "courier": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -67
+    },
+    "weaponLength": 74,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "doctor": {
+    "height": 132,
+    "shoulder": {
+      "x": 11,
+      "y": -67
+    },
+    "weaponLength": 72,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "electrician": {
+    "height": 132,
+    "shoulder": {
+      "x": 11,
+      "y": -64
+    },
+    "weaponLength": 72,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "engineer": {
+    "height": 132,
+    "shoulder": {
+      "x": 13,
+      "y": -64
+    },
+    "weaponLength": 65,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "farmer": {
+    "height": 132,
+    "shoulder": {
+      "x": 14,
+      "y": -64
+    },
+    "weaponLength": 68,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "lawyer": {
+    "height": 132,
+    "shoulder": {
+      "x": 16,
+      "y": -62
+    },
+    "weaponLength": 70,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "mechanic": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -66
+    },
+    "weaponLength": 62,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "merchant": {
+    "height": 132,
+    "shoulder": {
+      "x": 16,
+      "y": -62
+    },
+    "weaponLength": 72,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "miner": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -57
+    },
+    "weaponLength": 63,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "nurse": {
+    "height": 132,
+    "shoulder": {
+      "x": 9,
+      "y": -56
+    },
+    "weaponLength": 70,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "pilot": {
+    "height": 132,
+    "shoulder": {
+      "x": 9,
+      "y": -62
+    },
+    "weaponLength": 65,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "plumber": {
+    "height": 132,
+    "shoulder": {
+      "x": 13,
+      "y": -64
+    },
+    "weaponLength": 68,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "police": {
+    "height": 132,
+    "shoulder": {
+      "x": 14,
+      "y": -60
+    },
+    "weaponLength": 59,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "programmer": {
+    "height": 132,
+    "shoulder": {
+      "x": 17,
+      "y": -56
+    },
+    "weaponLength": 70,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "scientist": {
+    "height": 132,
+    "shoulder": {
+      "x": 18,
+      "y": -60
+    },
+    "weaponLength": 74,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "soldier": {
+    "height": 132,
+    "shoulder": {
+      "x": 14,
+      "y": -62
+    },
+    "weaponLength": 74,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "tailor": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -68
+    },
+    "weaponLength": 67,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "teacher": {
+    "height": 132,
+    "shoulder": {
+      "x": 12,
+      "y": -66
+    },
+    "weaponLength": 61,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "waiter": {
+    "height": 132,
+    "shoulder": {
+      "x": 16,
+      "y": -67
+    },
+    "weaponLength": 55,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  },
+  "welder": {
+    "height": 132,
+    "shoulder": {
+      "x": 8,
+      "y": -60
+    },
+    "weaponLength": 68,
+    "weaponAngle": 0,
+    "pivot": {
+      "x": 0.5,
+      "y": 0.9
+    }
+  }
+}

@@ -1,0 +1,737 @@
+{
+  "version": 1,
+  "stamp": 1795660463021,
+  "characters": {
+    "accountant": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 14,
+          "y": -60
+        },
+        "weaponLength": 69,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "accountant/body.webp",
+      "weapon": "accountant/weapon.webp",
+      "bust": "accountant/bust.webp",
+      "icon": "accountant/icon.webp"
+    },
+    "artist": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 18,
+          "y": -58
+        },
+        "weaponLength": 76,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "artist/body.webp",
+      "weapon": "artist/weapon.webp",
+      "bust": "artist/bust.webp",
+      "icon": "artist/icon.webp"
+    },
+    "athlete": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 19,
+          "y": -61
+        },
+        "weaponLength": 76,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "athlete/body.webp",
+      "weapon": "athlete/weapon.webp",
+      "bust": "athlete/bust.webp",
+      "icon": "athlete/icon.webp"
+    },
+    "barber": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -61
+        },
+        "weaponLength": 76,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "barber/body.webp",
+      "weapon": "barber/weapon.webp",
+      "bust": "barber/bust.webp",
+      "icon": "barber/icon.webp"
+    },
+    "builder": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 11,
+          "y": -62
+        },
+        "weaponLength": 71,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "builder/body.webp",
+      "weapon": "builder/weapon.webp",
+      "bust": "builder/bust.webp",
+      "icon": "builder/icon.webp"
+    },
+    "chef": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 17,
+          "y": -54
+        },
+        "weaponLength": 80,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "chef/body.webp",
+      "weapon": "chef/weapon.webp",
+      "bust": "chef/bust.webp",
+      "icon": "chef/icon.webp"
+    },
+    "cleaner": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 14,
+          "y": -67
+        },
+        "weaponLength": 80,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "cleaner/body.webp",
+      "weapon": "cleaner/weapon.webp",
+      "bust": "cleaner/bust.webp",
+      "icon": "cleaner/icon.webp"
+    },
+    "courier": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -67
+        },
+        "weaponLength": 74,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "courier/body.webp",
+      "weapon": "courier/weapon.webp",
+      "bust": "courier/bust.webp",
+      "icon": "courier/icon.webp"
+    },
+    "doctor": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 11,
+          "y": -67
+        },
+        "weaponLength": 72,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "doctor/body.webp",
+      "weapon": "doctor/weapon.webp",
+      "bust": "doctor/bust.webp",
+      "icon": "doctor/icon.webp"
+    },
+    "electrician": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 11,
+          "y": -64
+        },
+        "weaponLength": 72,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "electrician/body.webp",
+      "weapon": "electrician/weapon.webp",
+      "bust": "electrician/bust.webp",
+      "icon": "electrician/icon.webp"
+    },
+    "engineer": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 13,
+          "y": -64
+        },
+        "weaponLength": 65,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "engineer/body.webp",
+      "weapon": "engineer/weapon.webp",
+      "bust": "engineer/bust.webp",
+      "icon": "engineer/icon.webp"
+    },
+    "farmer": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 14,
+          "y": -64
+        },
+        "weaponLength": 68,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "farmer/body.webp",
+      "weapon": "farmer/weapon.webp",
+      "bust": "farmer/bust.webp",
+      "icon": "farmer/icon.webp"
+    },
+    "firefighter": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 22,
+          "y": -60
+        },
+        "weaponLength": 78,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "firefighter/body.webp",
+      "weapon": "firefighter/weapon.webp",
+      "bust": "firefighter/bust.webp",
+      "icon": "firefighter/icon.webp"
+    },
+    "fisher": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 16,
+          "y": -57
+        },
+        "weaponLength": 120,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "fisher/body.webp",
+      "weapon": "fisher/weapon.webp",
+      "bust": "fisher/bust.webp",
+      "icon": "fisher/icon.webp"
+    },
+    "lawyer": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 16,
+          "y": -62
+        },
+        "weaponLength": 70,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "lawyer/body.webp",
+      "weapon": "lawyer/weapon.webp",
+      "bust": "lawyer/bust.webp",
+      "icon": "lawyer/icon.webp"
+    },
+    "mechanic": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -66
+        },
+        "weaponLength": 62,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "mechanic/body.webp",
+      "weapon": "mechanic/weapon.webp",
+      "bust": "mechanic/bust.webp",
+      "icon": "mechanic/icon.webp"
+    },
+    "merchant": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 16,
+          "y": -62
+        },
+        "weaponLength": 72,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "merchant/body.webp",
+      "weapon": "merchant/weapon.webp",
+      "bust": "merchant/bust.webp",
+      "icon": "merchant/icon.webp"
+    },
+    "miner": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -57
+        },
+        "weaponLength": 63,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "miner/body.webp",
+      "weapon": "miner/weapon.webp",
+      "bust": "miner/bust.webp",
+      "icon": "miner/icon.webp"
+    },
+    "musician": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 16,
+          "y": -61
+        },
+        "weaponLength": 108,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.08,
+          "y": 0.61
+        }
+      },
+      "body": "musician/body.webp",
+      "weapon": "musician/weapon.webp",
+      "bust": "musician/bust.webp",
+      "icon": "musician/icon.webp"
+    },
+    "nurse": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 9,
+          "y": -56
+        },
+        "weaponLength": 70,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "nurse/body.webp",
+      "weapon": "nurse/weapon.webp",
+      "bust": "nurse/bust.webp",
+      "icon": "nurse/icon.webp"
+    },
+    "pilot": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 9,
+          "y": -62
+        },
+        "weaponLength": 65,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "pilot/body.webp",
+      "weapon": "pilot/weapon.webp",
+      "bust": "pilot/bust.webp",
+      "icon": "pilot/icon.webp"
+    },
+    "plumber": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 13,
+          "y": -64
+        },
+        "weaponLength": 68,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "plumber/body.webp",
+      "weapon": "plumber/weapon.webp",
+      "bust": "plumber/bust.webp",
+      "icon": "plumber/icon.webp"
+    },
+    "police": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 14,
+          "y": -60
+        },
+        "weaponLength": 59,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "police/body.webp",
+      "weapon": "police/weapon.webp",
+      "bust": "police/bust.webp",
+      "icon": "police/icon.webp"
+    },
+    "programmer": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 17,
+          "y": -56
+        },
+        "weaponLength": 70,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "programmer/body.webp",
+      "weapon": "programmer/weapon.webp",
+      "bust": "programmer/bust.webp",
+      "icon": "programmer/icon.webp"
+    },
+    "scientist": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 18,
+          "y": -60
+        },
+        "weaponLength": 74,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "scientist/body.webp",
+      "weapon": "scientist/weapon.webp",
+      "bust": "scientist/bust.webp",
+      "icon": "scientist/icon.webp"
+    },
+    "soldier": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 14,
+          "y": -62
+        },
+        "weaponLength": 74,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "soldier/body.webp",
+      "weapon": "soldier/weapon.webp",
+      "bust": "soldier/bust.webp",
+      "icon": "soldier/icon.webp"
+    },
+    "tailor": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -68
+        },
+        "weaponLength": 67,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "tailor/body.webp",
+      "weapon": "tailor/weapon.webp",
+      "bust": "tailor/bust.webp",
+      "icon": "tailor/icon.webp"
+    },
+    "teacher": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 12,
+          "y": -66
+        },
+        "weaponLength": 61,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "teacher/body.webp",
+      "weapon": "teacher/weapon.webp",
+      "bust": "teacher/bust.webp",
+      "icon": "teacher/icon.webp"
+    },
+    "waiter": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 16,
+          "y": -67
+        },
+        "weaponLength": 55,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "waiter/body.webp",
+      "weapon": "waiter/weapon.webp",
+      "bust": "waiter/bust.webp",
+      "icon": "waiter/icon.webp"
+    },
+    "welder": {
+      "rig": {
+        "height": 132,
+        "shoulder": {
+          "x": 8,
+          "y": -60
+        },
+        "weaponLength": 68,
+        "weaponAngle": 0,
+        "pivot": {
+          "x": 0.5,
+          "y": 0.9
+        }
+      },
+      "body": "welder/body.webp",
+      "weapon": "welder/weapon.webp",
+      "bust": "welder/bust.webp",
+      "icon": "welder/icon.webp"
+    }
+  },
+  "arenas": {
+    "market": {
+      "src": "arena/market.webp",
+      "floor": {
+        "x": 0.1,
+        "y": 0.22,
+        "w": 0.8,
+        "h": 0.58
+      }
+    }
+  },
+  "props": {
+    "wall": "props/wall.webp",
+    "turret": "props/turret.webp",
+    "trap": "props/trap.webp",
+    "pipe": "props/pipe.webp",
+    "sprout": "props/sprout.webp",
+    "pumpkin": "props/pumpkin.webp",
+    "hook": "props/hook.webp",
+    "tray": "props/tray.webp",
+    "ball": "props/ball.webp",
+    "grenade": "props/grenade.webp",
+    "beam": "props/beam.webp",
+    "gem": "props/gem.webp",
+    "truck": "props/truck.webp",
+    "plane": "props/plane.webp",
+    "fish": "props/fish.webp",
+    "wreckingBall": "props/wreckingBall.webp",
+    "boulder": "props/boulder.webp",
+    "gavel": "props/gavel.webp",
+    "dish": "props/dish.webp",
+    "coins": "props/coins.webp",
+    "potion": "props/potion.webp",
+    "parcelBomb": "props/parcelBomb.webp",
+    "needle": "props/needle.webp",
+    "flask": "props/flask.webp",
+    "fire": "props/fire.webp",
+    "water": "props/water.webp",
+    "lightning": "props/lightning.webp",
+    "dust": "props/dust.webp",
+    "wetSign": "props/wetSign.webp",
+    "acid": "props/acid.webp"
+  },
+  "cards": {
+    "overtime-pay": "cards/overtime-pay.webp",
+    "hard-hat": "cards/hard-hat.webp",
+    "health-plan": "cards/health-plan.webp",
+    "coffee-break": "cards/coffee-break.webp",
+    "running-shoes": "cards/running-shoes.webp",
+    "long-reach": "cards/long-reach.webp",
+    "steady-hands": "cards/steady-hands.webp",
+    "light-feet": "cards/light-feet.webp",
+    "safety-gear": "cards/safety-gear.webp",
+    "sharp-eye": "cards/sharp-eye.webp",
+    "heavy-lunch": "cards/heavy-lunch.webp",
+    "fast-learner": "cards/fast-learner.webp",
+    "first-aid": "cards/first-aid.webp",
+    "thick-skin": "cards/thick-skin.webp",
+    "pep-talk": "cards/pep-talk.webp",
+    "night-shift": "cards/night-shift.webp",
+    "spiky-uniform": "cards/spiky-uniform.webp",
+    "overclock": "cards/overclock.webp",
+    "adrenaline": "cards/adrenaline.webp",
+    "hot-temper": "cards/hot-temper.webp",
+    "combo-breaker": "cards/combo-breaker.webp",
+    "poison-pen": "cards/poison-pen.webp",
+    "hot-coffee": "cards/hot-coffee.webp",
+    "counter-clerk": "cards/counter-clerk.webp",
+    "second-wind": "cards/second-wind.webp",
+    "hazard-pay": "cards/hazard-pay.webp",
+    "momentum": "cards/momentum.webp",
+    "executioner": "cards/executioner.webp",
+    "iron-will": "cards/iron-will.webp",
+    "bounty-hunter": "cards/bounty-hunter.webp",
+    "double-shift": "cards/double-shift.webp",
+    "encore": "cards/encore.webp",
+    "golden-parachute": "cards/golden-parachute.webp",
+    "chain-reaction": "cards/chain-reaction.webp",
+    "giant-mode": "cards/giant-mode.webp",
+    "berserker": "cards/berserker.webp",
+    "glass-cannon": "cards/glass-cannon.webp",
+    "aegis": "cards/aegis.webp",
+    "workaholic": "cards/workaholic.webp",
+    "reflective-vest": "cards/reflective-vest.webp",
+    "critical-mass": "cards/critical-mass.webp",
+    "flow-state": "cards/flow-state.webp",
+    "grudge": "cards/grudge.webp",
+    "lightning-rod": "cards/lightning-rod.webp",
+    "phoenix": "cards/phoenix.webp",
+    "bulwark": "cards/bulwark.webp",
+    "brawlers-blood": "cards/brawlers-blood.webp",
+    "backstab": "cards/backstab.webp",
+    "mana-surge": "cards/mana-surge.webp",
+    "eagle-eye": "cards/eagle-eye.webp",
+    "field-medic": "cards/field-medic.webp",
+    "mind-games": "cards/mind-games.webp",
+    "secret-recipe": "cards/secret-recipe.webp",
+    "fireproof-suit": "cards/fireproof-suit.webp",
+    "high-voltage": "cards/high-voltage.webp",
+    "night-nurse": "cards/night-nurse.webp",
+    "express-lane": "cards/express-lane.webp",
+    "big-catch": "cards/big-catch.webp",
+    "harvest-moon": "cards/harvest-moon.webp",
+    "reinforced-steel": "cards/reinforced-steel.webp",
+    "mother-lode": "cards/mother-lode.webp",
+    "hot-seam": "cards/hot-seam.webp",
+    "pressure-washer": "cards/pressure-washer.webp",
+    "upgrade-kit": "cards/upgrade-kit.webp",
+    "load-bearing": "cards/load-bearing.webp",
+    "afterburner": "cards/afterburner.webp",
+    "compound-interest": "cards/compound-interest.webp",
+    "fine-service": "cards/fine-service.webp",
+    "sanitizer": "cards/sanitizer.webp",
+    "perfect-fit": "cards/perfect-fit.webp",
+    "fresh-fade": "cards/fresh-fade.webp",
+    "second-opinion": "cards/second-opinion.webp",
+    "unstable-formula": "cards/unstable-formula.webp",
+    "extra-credit": "cards/extra-credit.webp",
+    "overclocked-cpu": "cards/overclocked-cpu.webp",
+    "tax-return": "cards/tax-return.webp",
+    "objection-sustained": "cards/objection-sustained.webp",
+    "riot-gear": "cards/riot-gear.webp",
+    "battle-hardened": "cards/battle-hardened.webp",
+    "masterpiece": "cards/masterpiece.webp",
+    "standing-ovation": "cards/standing-ovation.webp",
+    "second-half": "cards/second-half.webp",
+    "fx-pick": "cards/fx-pick.webp",
+    "fx-epic": "cards/fx-epic.webp",
+    "fx-shield": "cards/fx-shield.webp",
+    "fx-phoenix": "cards/fx-phoenix.webp",
+    "fx-parachute": "cards/fx-parachute.webp",
+    "fx-chain": "cards/fx-chain.webp",
+    "fx-rod": "cards/fx-rod.webp",
+    "fx-overtime": "cards/fx-overtime.webp"
+  },
+  "poster": {
+    "landscape": "poster/landscape.webp",
+    "portrait": "poster/portrait.webp"
+  },
+  "ui": {
+    "mode-pvp": "ui/mode-pvp.webp",
+    "mode-story": "ui/mode-story.webp",
+    "mode-cpu": "ui/mode-cpu.webp",
+    "trophy": "ui/trophy.webp",
+    "loader-badge": "ui/loader-badge.webp",
+    "rank-intern": "ui/rank-intern.webp",
+    "rank-associate": "ui/rank-associate.webp",
+    "rank-specialist": "ui/rank-specialist.webp",
+    "rank-manager": "ui/rank-manager.webp",
+    "rank-director": "ui/rank-director.webp",
+    "rank-executive": "ui/rank-executive.webp",
+    "rank-ceo": "ui/rank-ceo.webp",
+    "district-1": "ui/district-1.webp",
+    "district-2": "ui/district-2.webp",
+    "district-3": "ui/district-3.webp",
+    "district-4": "ui/district-4.webp",
+    "district-5": "ui/district-5.webp",
+    "district-6": "ui/district-6.webp",
+    "star": "ui/star.webp",
+    "lock": "ui/lock.webp"
+  }
+}

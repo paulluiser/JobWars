@@ -1,0 +1,35 @@
+{
+  "name": "job-wars",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "simstats": "tsx tools/simstats.ts",
+    "art": "tsx tools/art/cli.ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "art:prompts": "tsx tools/art/prompts.ts",
+    "tune": "tsx tools/tune.ts",
+    "tagstats": "tsx tools/tagstats.ts",
+    "tune:tag": "tsx tools/tunetag.ts",
+    "sfx": "tsx tools/sfx/build.ts",
+    "tune:gacha": "tsx tools/tunegacha.ts",
+    "gachastats": "tsx tools/gachastats.ts",
+    "art:cards": "tsx tools/art/cardprompt.ts"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.4",
+    "pixi.js": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.10",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}

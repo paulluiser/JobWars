@@ -1,0 +1,87 @@
+// Every recorded sound the game uses, cut from Meta's "Oculus Audio Pack 01" (CC BY 4.0,
+// github.com/facebookincubator/Meta-open-sound). Keys are what the game asks for
+// (src/audio/sfxmap.ts); `start`/`dur` cut one hit out of a longer recording (seconds).
+export interface Cut { file: string; start?: number; dur?: number; gain?: number }
+
+const O = (n: string, start?: number, dur?: number, gain?: number): Cut => ({ file: `${n}.ogg`, start, dur, gain });
+
+export const SAMPLES: Record<string, Cut> = {
+  // ---- swings & misses ----
+  whoosh1: O('WHSH_WhooshMedium_OS_01'), whoosh2: O('WHSH_WhooshMedium_OS_02'), whoosh3: O('WHSH_WhooshMedium_OS_03'),
+  whooshS1: O('WHSH_WhooshSmall_OS_01'), whooshS2: O('WHSH_WhooshSmall_OS_02'), whooshS3: O('WHSH_WhooshSmall_OS_03'),
+  swoosh1: O('SWSH_Swoosh_OS_01'), swoosh2: O('SWSH_Swoosh_OS_02'), swoosh3: O('SWSH_Swoosh_OS_03'),
+  swoosh4: O('SWSH_Swoosh_OS_04'), swoosh5: O('SWSH_Swoosh_OS_05'), swoosh6: O('SWSH_Swoosh_OS_06'),
+  // ---- impacts ----
+  punch1: O('FGHTImpt_PunchRegular_OS_01'), punch2: O('FGHTImpt_PunchRegular_OS_02'), punch3: O('FGHTImpt_PunchRegular_OS_03'),
+  punch4: O('FGHTImpt_PunchRegular_OS_04'), punch5: O('FGHTImpt_PunchRegular_OS_05'), punch6: O('FGHTImpt_PunchRegular_OS_06'),
+  punchH1: O('FGHTImpt_PunchHarder_OS_01'), punchH2: O('FGHTImpt_PunchHarder_OS_02'), punchH3: O('FGHTImpt_PunchHarder_OS_03'), punchH4: O('FGHTImpt_PunchHarder_OS_04'),
+  punchX: O('FGHTImpt_PunchHardest_OS_01'),
+  kick1: O('FGHTImpt_Kick_OS_01'), kick2: O('FGHTImpt_Kick_OS_02'), kick3: O('FGHTImpt_Kick_OS_03'), kick4: O('FGHTImpt_Kick_OS_04'), kick5: O('FGHTImpt_Kick_OS_05'),
+  // ---- defence ----
+  swordClash: O('WEAPSwrd_SwordClash_OS_01'), swordScrape1: O('WEAPSwrd_SwordScrape_OS_01', 0, 0.8), swordScrape2: O('WEAPSwrd_SwordScrape_OS_02', 0, 0.8),
+  sword1: O('WEAPSwrd_Sword_OS_01'), sword2: O('WEAPSwrd_Sword_OS_02'),
+  bone1: O('GOREBone_BonesBreaking_OS_01'), bone2: O('GOREBone_BonesBreaking_OS_02', 0, 1), bone3: O('GOREBone_BonesBreaking_OS_03', 0, 1),
+  cloth1: O('CLOTHMvmt_ClothingMovement_OS_01'), cloth2: O('CLOTHMvmt_ClothingMovement_OS_02'), cloth3: O('CLOTHMvmt_ClothingMovement_OS_03', 0, 0.7),
+  gear1: O('CLOTHMvmt_MovementWithGear_OS_01', 0, 0.6), gear2: O('CLOTHMvmt_MovementWithGear_OS_02'),
+  boing1: O('TOONBoing_BounceCartoony_OS_01'), boing2: O('TOONBoing_BounceCartoony_OS_02', 0, 0.8), boing3: O('TOONBoing_BounceCartoony_OS_03', 0, 0.8), boing4: O('TOONBoing_BounceCartoony_OS_04', 0, 0.8),
+  bigImpact1: O('DSGNImpt_ImpactCreepyReverb_OS_01', 0, 2.2), bigImpact2: O('DSGNImpt_ImpactCreepyReverb_OS_02', 0, 2.2), bigImpact3: O('DSGNImpt_ImpactCreepyReverb_OS_03', 0, 2.2),
+  // ---- materials (per-job hit layers & props) ----
+  anvil: O('METLImpt_HammerAnvil_OS_01'), anvilRing: O('METLImpt_HammerAnvilAmbient_OS_01', 0.2, 1.6),
+  metal1: O('METLImpt_MetalHitSurface_OS_01'), metal2: O('METLImpt_MetalHitSurface_OS_02'), metal3: O('METLImpt_MetalHitSurface_OS_03'),
+  metal4: O('METLImpt_MetalHitSurface_OS_04'), metal5: O('METLImpt_MetalHitSurface_OS_05'),
+  metalDrop1: O('METLImpt_MetalObjDrop_OS_01'), metalDrop2: O('METLImpt_MetalObjDrop_OS_02'), metalDrop3: O('METLImpt_MetalObjDrop_OS_03'), metalDrop4: O('METLImpt_MetalObjDrop_OS_04'),
+  bucket: O('METLImpt_BucketDrop_OS_01'), can: O('METLImpt_CanDrop_OS_01'),
+  ceramic: O('CERMImpt_CeramicSmallImpact_OS_01'), spoon: O('FOODTware_SpoonDrop_OS_01'),
+  glassDrop: O('GLASImpt_GlassBottleDrop_OS_01'), glassBreak: O('GLASBrk_GlassBottleBreak_OS_01'), paneBreak: O('GLASBrk_WindowPaneSmallBreak_OS_01'),
+  woodDrop: O('WOODImpt_LargeWoodDrop_OS_01'), woodDrag: O('WOODFric_LargeWoodMetalDrag_OS_01', 0, 1.2),
+  plasticBottle: O('PLASImpt_PlasticBottleDrop_OS_01'), plasticCup: O('PLASImpt_PlasticCupDrop_OS_01'), plasticObj: O('PLASImpt_PlasticObjDrop_OS_01'), plasticOnMetal: O('PLASImpt_PlasticObjOnMetalDrop_OS_01'),
+  canvasDrop: O('OBJBag_CanvasCaseDrop_OS_01'), toolBag: O('OBJBag_ToolBagDrop_OS_01'), bagClose: O('OBJBag_KnapsackNylonClose_OS_01', 0, 0.7),
+  caseClose: O('OBJLug_CaseClose_OS_01'), caseOpen: O('OBJLug_CaseOpen_OS_01'),
+  coinDrop: O('OBJCoin_CoinDrop_OS_01'), coins: O('OBJCoin_CoinsUI_LOOP_01', 0, 1.3), keyDrop: O('OBJKey_KeyDrop_OS_01'),
+  bookClose: O('OBJBook_BookClose_OS_01'), bookOpen: O('OBJBook_BookOpen_OS_01'), pages: O('PAPRHndl_BookPageTurns_OS_01', 0.2, 1.2),
+  crumple: O('PAPRHndl_PaperCrumple_OS_01', 0, 0.9), paperBall: O('PAPRImpt_PaperBallDrop_OS_01'), paperTear: O('PAPRRip_PaperTear_OS_01'),
+  knifeScrape: O('WEAPKnif_KnifeScrape_OS_01'), axeChop: O('WEAPAxe_WoodCutAxe_OS_01', 0, 0.9),
+  shell1: O('BLLTShel_ShellCasingConcrete_OS_01'), shell2: O('BLLTShel_ShellCasingMetal_OS_01'), shell3: O('BLLTShel_ShellCasingGrass_OS_01'),
+  squish1: O('GORESqsh_BloodSquishSlimy_OS_01', 0, 0.7), squish2: O('GORESqsh_BloodSquishSlimy_OS_03', 0, 0.8),
+  leaves: O('VEGELeaf_MovementThroughBushes_OS_01', 0.4, 1.1),
+  // ---- mechanisms & tools ----
+  lever: O('MECHLvr_LeverPull_OS_01'), lever2: O('MECHLvr_LeverPull_OS_03'),
+  switchOn: O('MECHSwtch_SwitchSmallOn_OS_01'), switchOff: O('MECHSwtch_SwitchSmallOff_OS_02'),
+  lockKey: O('MECHLock_DoorLockKey_OS_01'), unlockKey: O('MECHLock_DoorUnlockKey_OS_01', 0, 1.1),
+  doorLock: O('DOORHdwr_FrontDoorLock_OS_01'), slideLock: O('DOORHdwr_SlidingDoorLock_OS_01'), knock: O('DOORKnck_OfficeDoorKnock_OS_01'),
+  knockOne: O('DOORKnck_OfficeDoorKnock_OS_01', 0, 0.28), doorSlam: O('DOORWood_OfficeDoorClose_OS_01'),
+  hatchClose: O('DOORMetl_HatchClose_OS_01', 0, 1.3), carDoor: O('VEHDoor_CarDoorClose_OS_01'), trunk: O('VEHDoor_CarTrunkClose_OS_01'), shiftStick: O('VEHMech_CarShiftStick_OS_01'),
+  engine: O('VEHCar_CarStartRunStop_OS_01', 0.4, 1.8), engineHigh: O('VEHCar_CarEngineHigh_LOOP_01', 0, 1.4),
+  electricBox: O('METLHndl_ElectricBoxOpen_OS_01'), hvacOff: O('MACHHvac_HVACOff_OS_01', 0, 1.6), fanStart: O('MACHFan_FanStart_OS_01', 0.3, 1.3),
+  servo: O('MOTRSrvo_Servo_OS_01', 0, 1.2), hydraulic: O('MACHInd_Hydraulic_OS_01', 0, 1.6),
+  powerTool: O('TOOLPowr_PowerTool_OS_01', 0, 1.1), grinder: O('TOOLPowr_PowerTool_OS_05', 0, 1.1), saw: O('TOOLPowr_CircularSaw_OS_01', 0.5, 1.2),
+  faucetOn: O('WATRPlmb_FaucetOn_OS_01'), faucetOff: O('WATRPlmb_FaucetOff_OS_01'), faucetRun: O('WATRPlmb_FaucetWaterRun_LOOP_01', 0, 1.3),
+  valve: O('WATRPlmb_ValveTurn_OS_01'), flush: O('WATRPlmb_ToiletFlushEuropean_OS_01', 0.3, 2.4), bubbles: O('WATRBubl_WaterBubbles_LOOP_01', 0, 1.2),
+  oar: O('BOATRow_RowboatOarRowing_OS_01', 0, 1.1),
+  typing: O('UIClick_KeyboardTyping_OS_01', 1, 1.1), burp: O('HMNBurp_Burp_OS_01'),
+  laser1: O('LASRGun_LaserShootUI_OS_01'), laser2: O('LASRGun_LaserShootUI_OS_02'),
+  spell1: O('MAGSpel_MagicSpell_OS_01', 0, 1.8), spell2: O('MAGSpel_MagicSpell_OS_02', 0, 2.2),
+  chains: O('CHAINMvmt_ChainsCreepy_OS_02', 0.2, 1.1),
+  // ---- animals ----
+  dog: O('ANMLDog_DogBark_OS_01'), dog2: O('ANMLDog_DogBark_OS_02'), sheep: O('ANMLFarm_Sheep_OS_01'), pig: O('ANMLFarm_PigSqueal_OS_01'),
+  chicken: O('BIRDFowl_Chicken_OS_01', 0, 1.4), horse: O('ANMLHors_HorseNeigh_OS_01'),
+  // ---- UI & alerts ----
+  uiConfirm: O('UIClick_WoodConfirm_OS_01'), uiBack: O('UIClick_WoodBack_OS_01'), uiTab: O('UIClick_CasualPopsConfirm_OS_01'),
+  uiGo: O('UIClick_MagicalConfirm_OS_01'), uiOpen: O('UIClick_MagicalOpen_OS_01', 0, 1.2), uiClose: O('UIClick_CasualPopsClose_OS_01'),
+  hiTechConfirm: O('UIClick_ScifiHightechConfirm_OS_01'), hiTechBack: O('UIClick_ScifiHightechBack_OS_01'), hiTechOpen: O('UIClick_ScifiHightechOpen_OS_01'),
+  sciOpen: O('UIClick_ScifiTraditionalOpen_OS_01'), sciConfirm: O('UIClick_ScifiTraditionalConfirm_OS_01'), metalConfirm: O('UIClick_MetalConfirm_OS_01'),
+  musicalOpen: O('UIClick_CasualMusicalOpen_OS_01'),
+  notify1: O('UIAlert_Notification_OS_01'), notify2: O('UIAlert_Notification_OS_02'), notify3: O('UIAlert_Notification_OS_03'), notify4: O('UIAlert_Notification_OS_04'), notify5: O('UIAlert_Notification_OS_05'),
+  errMagic: O('UIAlert_MagicalError_OS_01'), errMetal: O('UIAlert_MetalError_OS_01'), errWood: O('UIAlert_WoodError_OS_01'), errPops: O('UIAlert_CasualPopsError_OS_01'),
+  errHiTech: O('UIAlert_ScifiHightechError_OS_01'), errSciFi: O('UIAlert_ScifiTraditionalError_OS_01'), errMusical: O('UIAlert_CasualMusicalError_OS_01'),
+  tone1: O('UIAlert_MusicTone_OS_01', 0, 1.6), tone3: O('UIAlert_MusicTone_OS_03', 0, 1.6),
+  countUp: O('UIData_CasualCountup_OS_01'), powerUp1: O('UIMisc_Powerup_OS_01'), powerUp2: O('UIMisc_Powerup_OS_02'),
+  bellUp: O('UIMisc_BelltreeUp_OS_01', 0, 1.6), bellDown: O('UIMisc_BelltreeDown_OS_01', 0, 1.4),
+  // ---- stingers ----
+  snareCrash: O('MUSCStngr_SnareCrash_OS_01'), marchSnare: O('MUSCStngr_MarchingSnare_OS_01', 0, 2.2),
+  levelUp: O('MUSCStngr_LevelUpOrchestral_OS_01'), levelUpMallet: O('MUSCStngr_LevelUpMallet_OS_01', 0, 2),
+  victory: O('MUSCStngr_VictoryOrchestral_OS_01'), victoryBig: O('MUSCStngr_VictoryOrchestral_OS_03', 0, 4.5),
+  lossMallet: O('MUSCStngr_LossMallet_OS_01', 0, 3), guitarUp: O('MUSCStngr_ElectricGuitarPositive_OS_01'), guitarUp2: O('MUSCStngr_ElectricGuitarPositive_OS_02'),
+  guitarDown: O('MUSCStngr_ElectricGuitarNegative_OS_01'), banjo: O('MUSCStngr_BanjoHumorous_OS_01', 0, 2.2), acousticUp: O('MUSCStngr_AcousticGuitarPositive_OS_02', 0, 2),
+  victoryElectronic: O('MUSCStngr_VictoryElectronic_OS_01'),
+};
