@@ -164,6 +164,8 @@ export class Hud {
   private vig = [$('#vig0'), $('#vig1')];
   private flashEl = $('#flash');
   private callEl = $('#callout');
+  private announcement = 0;
+  private announcementPriority = 0;
 
   setup(sim: Sim, teamColors: string[], yours?: BattleSide, playerNames?: string[]) {
     this.royale.hidden = !sim.opts.royale;
@@ -188,9 +190,11 @@ export class Hud {
     for (let i = 0; i < 4; i++) $(`#b${i}`).hidden = !this.banners.some((b) => b.el.id === `b${i}`);
     this.seedEl.textContent = `Seed ${sim.seed}`;
     this.callEl.className = '';
+    this.announcement = 0;
   }
 
   update(sim: Sim, dt: number) {
+    this.announcement = Math.max(0, this.announcement - dt);
     for (const b of this.banners) b.update(dt);
     const left = Math.max(0, Math.ceil(sim.timeLimit - sim.t));
     this.timer.textContent = String(left);
@@ -214,10 +218,19 @@ export class Hud {
     this.flashEl.animate([{ opacity }, { opacity: 0 }], { duration: ms, easing: 'ease-out' });
   }
 
-  callout(text: string, color = '#ffd23f') {
+  /** The large banner has one slot. An elimination can interrupt a special. */
+  announce(text: string, color: string, priority: 1 | 2) {
+    if (this.announcement > 0 && priority <= this.announcementPriority) return;
+    this.callout(text, color, true);
+    this.announcement = 1.4;
+    this.announcementPriority = priority;
+  }
+
+  callout(text: string, color = '#ffd23f', combat = false) {
     this.callEl.textContent = text;
     this.callEl.style.color = color;
     this.callEl.classList.remove('show');
+    this.callEl.classList.toggle('combat', combat);
     void this.callEl.offsetWidth;
     this.callEl.classList.add('show');
   }

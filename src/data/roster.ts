@@ -31,9 +31,9 @@ const CHEF: FighterDef = {
   },
   active: {
     name: 'Flambé',
-    cooldown: 9,
+    cooldown: 8.25,
     simple: 'Tosses fire from the wok and sets the enemy on fire.',
-    detailed: 'Used when the foe is within 125% of reach. 140% ATK and Burn 3 s (2% max HP/s, healing −30%). Can be dodged.',
+    detailed: 'Used when the foe is within 125% of reach. 125% ATK and Burn 2.5 s (2% max HP/s, healing −30%). Can be dodged.',
   },
   special: {
     name: "Chef's Special",
@@ -65,9 +65,9 @@ const FIREFIGHTER: FighterDef = {
   },
   active: {
     name: 'High-Pressure Hose',
-    cooldown: 10,
+    cooldown: 13,
     simple: 'A water blast that pushes the enemy back and soaks them.',
-    detailed: 'Used when the foe is within 330 px. 1.5 s spray: 6 × 30% ATK, each pushing the foe back and applying Wet 4 s (Slow 15%, puts out Burn, makes Shock stun longer). Can’t be dodged.',
+    detailed: 'Used when the foe is within 330 px. 1.5 s spray: 6 × 36% ATK, each pushing the foe back and applying Wet 4 s (Slow 15%, puts out Burn, makes Shock stun longer). Can’t be dodged.',
   },
   special: {
     name: 'Backdraft',
@@ -99,9 +99,9 @@ const ELECTRICIAN: FighterDef = {
   },
   active: {
     name: 'Short Circuit',
-    cooldown: 9,
+    cooldown: 12,
     simple: 'Drops a shock trap right where they are.',
-    detailed: 'Places a trap at its own position (max 2, lasts 8 s, arms after 0.6 s). An enemy bouncing into it takes 170% ATK and Stun 1 s (2 s if Wet).',
+    detailed: 'Places a trap at its own position (max 2, lasts 9 s, arms after 0.6 s). An enemy bouncing into it takes 205% ATK and Stun 1 s (2 s if Wet).',
   },
   special: {
     name: 'Blackout',
@@ -133,9 +133,9 @@ const NURSE: FighterDef = {
   },
   active: {
     name: 'Clear!',
-    cooldown: 11,
+    cooldown: 15,
     simple: 'Shocks the enemy with paddles and gets a little health back.',
-    detailed: 'Used when the foe is within 110% of reach. 140% ATK and Stun 0.8 s; heals self for 5% max HP. Can be dodged.',
+    detailed: 'Used when the foe is within 110% of reach. 165% ATK and Stun 0.9 s. Heals self for 6.5% max HP even if the foe dodges.',
   },
   special: {
     name: 'Code Blue',
@@ -167,9 +167,9 @@ const COURIER: FighterDef = {
   },
   active: {
     name: 'Ram',
-    cooldown: 7,
+    cooldown: 5.5,
     simple: 'Steers the scooter straight into the enemy.',
-    detailed: 'Used when the foe is within 430 px. Launches at the foe at 950 px/s; on contact deals 150% ATK (plus the Momentum bonus) with big knockback. Can be dodged.',
+    detailed: 'Used when the foe is within 430 px. Launches at the foe at 950 px/s; on contact deals 125% ATK (plus the Momentum bonus) with big knockback. Can be dodged.',
   },
   special: {
     name: 'Rush Hour',
@@ -201,9 +201,9 @@ const FISHER: FighterDef = {
   },
   active: {
     name: 'Hook & Reel',
-    cooldown: 10,
+    cooldown: 7,
     simple: 'Hooks a far-away enemy and reels them in.',
-    detailed: 'Used when the foe is 170–470 px away. Casts a hook at 1000 px/s; on hit 140% ATK, yanks the foe toward the Fisher and Stuns 0.5 s. Can be dodged.',
+    detailed: 'Used when the foe is 170–470 px away. Casts a hook at 1000 px/s; on hit 120% ATK, yanks the foe toward the Fisher and Stuns 0.35 s. Can be dodged.',
   },
   special: {
     name: 'The Big One',

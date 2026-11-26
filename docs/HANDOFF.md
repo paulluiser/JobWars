@@ -183,8 +183,9 @@ other elastically, weighted by Weight. Solid hazards (the Builder's walls) also 
 
 ### 5.2 The attack table
 
-Swings come on a continuous rhythm (windup → strike → recover, scaled by Attack speed). Each swing that reaches the
-target rolls, in order:
+A ready basic swing or charge can start when the target is in reach or their relative velocity projects it into
+reach within one basic wind-up. Attack speed scales the wind-up, recovery, and cooldown. Each swing that reaches
+the target at impact rolls, in order:
 
 1. **Airborne** target (Pilot's passive): auto-miss.
 2. **Dodge**: target's evasion (not while stunned/staggered or charging).

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, CARD_BY_ID, CARDS, CLASS_CARDS, GACHA, JOB_CARDS, augOf } from '../src/data/cards';
+import { ALL_CARDS, CARD_BY_ID, CARDS, CLASS_CARDS, JOB_CARDS, augOf } from '../src/data/cards';
 import { ROSTER, byId } from '../src/data/roster';
 import { offersFor, poolFor, replayGacha, runGacha } from '../src/modes/gacha';
 import { LEVELS, STARTERS, judge } from '../src/modes/story';
 import { delta, expected, rankOf } from '../src/modes/mmr';
 import { CARD_ART_NAMES } from '../tools/art/cardnames';
 import { Sim } from '../src/sim/sim';
+import { SURGE_TICKS } from '../src/net/roomSim';
 
 const def = (id: string) => byId(id)!;
 
@@ -74,7 +75,8 @@ describe('gacha matches', () => {
       const teams: [any[], any[]] = s % 2 ? [[def('miner'), def('nurse')], [def('pilot'), def('chef')]] : [[def('lawyer')], [def('athlete')]];
       const { sim, log } = runGacha(teams, 300 + s);
       const picksEach = log.filter((p) => p.team === 0).length;
-      expect(picksEach).toBe(1 + Math.floor(Math.min(sim.t, GACHA.timeLimit - 1e-9) / 15));
+      // Combat can end on a surge tick before the following step opens the draft.
+      expect(picksEach).toBe(1 + SURGE_TICKS.filter((tick) => tick < sim.tick).length);
       for (let pick = 0; pick < picksEach; pick++) {
         expect(new Set(log.filter((p) => p.pick === pick).map((p) => CARD_BY_ID.get(p.id)?.rarity)).size).toBe(1);
       }

@@ -98,6 +98,26 @@ describe('sim', () => {
     }
   }, 60000);
 
+  it('trades a longer cooldown for a stronger control cast', () => {
+    const cast = (id: string) => {
+      const caster = { ...byId(id)!, atk: 100, skillAtk: 100, critChance: 0 };
+      const target = { ...byId('courier')!, def: 0, evasion: 0 };
+      const sim = new Sim([[caster], [target]], 42);
+      const [a, b] = sim.fighters;
+      a.targetIdx = b.idx;
+      a.activeCd = 0;
+      sim.castActive(a);
+      return { cooldown: a.activeCd, damage: b.maxHp - b.hp, control: b.statuses };
+    };
+
+    const yank = cast('plumber');
+    const cuffs = cast('police');
+    expect(cuffs.cooldown).toBeGreaterThanOrEqual(yank.cooldown * 2);
+    expect(cuffs.damage).toBeGreaterThan(yank.damage);
+    expect(yank.control).toContainEqual(expect.objectContaining({ kind: 'silence', remaining: 1 }));
+    expect(cuffs.control).toContainEqual(expect.objectContaining({ kind: 'disarm', remaining: 2 }));
+  });
+
   it('specials fire only from a full rage bar, which then empties', { timeout: 60000 }, () => {
     let repeats = 0;
     for (const [i, j, a, b] of pairs()) {
@@ -145,11 +165,44 @@ describe('sim', () => {
     }
   });
 
-  it('swings continuously whether or not the foe is in reach', () => {
-    const { log } = run(3);
-    const swings = log.filter((e) => e.type === 'swing');
-    expect(swings.some((e) => e.type === 'swing' && !e.inReach)).toBe(true);
-    expect(swings.some((e) => e.type === 'swing' && e.inReach)).toBe(true);
+  function swingSetup(heavy = false) {
+    const def = { ...byId('chef')!, radius: 25, range: 90, speed: 300, windup: 0.25, chargeChance: heavy ? 1 : 0 };
+    const sim = new Sim([[def], [def]], 3);
+    const [a, b] = sim.fighters;
+    Object.assign(a, { x: 120, y: 200, vx: 300, vy: 0, attackCd: 0, activeCd: 99 });
+    Object.assign(b, { x: 260, y: 200, vx: -300, vy: 0, attackCd: 99, activeCd: 99 });
+    return { sim, a, b };
+  }
+
+  it.each([
+    { name: 'closing into reach', x: 260, y: 200, vx: -300, starts: true },
+    { name: 'closing too far away', x: 400, y: 200, vx: -300, starts: false },
+    { name: 'moving apart outside reach', x: 260, y: 200, vx: 450, starts: false },
+    { name: 'moving together outside reach', x: 260, y: 200, vx: 300, starts: false },
+    { name: 'passing too far to the side', x: 260, y: 330, vx: -300, starts: false },
+  ])('checks reach before starting a basic swing when $name', ({ x, y, vx, starts }) => {
+    const { sim, a, b } = swingSetup();
+    Object.assign(b, { x, y, vx });
+    expect(sim.step().some((event) => event.type === 'windup' && event.a === a.idx)).toBe(starts);
+  });
+
+  it('does not begin a charge just because its longer wind-up could reach a distant foe', () => {
+    const { sim, b } = swingSetup(true);
+    b.x = 400;
+    expect(sim.step().some((e) => e.type === 'chargeStart')).toBe(false);
+    b.x = 260;
+    expect(sim.step()).toContainEqual({ type: 'chargeStart', a: 0 });
+  });
+
+  it('allows a swing to start in reach and rechecks reach at impact', () => {
+    const { sim, a, b } = swingSetup();
+    Object.assign(a, { vx: -300 });
+    Object.assign(b, { x: 225, vx: 300 });
+    expect(sim.step()).toContainEqual({ type: 'windup', a: 0 });
+    const events: SimEvent[] = [];
+    while (a.state === 'windup') events.push(...sim.step());
+    expect(events).toContainEqual({ type: 'swing', a: 0, heavy: false, inReach: false });
+    expect(b.hp).toBe(b.maxHp);
   });
 
   it('a block takes less damage than a clean hit', () => {

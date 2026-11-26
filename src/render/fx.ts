@@ -17,6 +17,8 @@ interface Particle {
   spin: number;
 }
 
+interface DamageLabel { label: Text; timer: Timed; amount: number; critical: boolean }
+
 interface Timed {
   obj: Container;
   life: number;
@@ -31,6 +33,8 @@ export class Fx {
   private particles: Particle[] = [];
   private pool: Sprite[] = [];
   private timed: Timed[] = [];
+  private damageLabels = new Map<number, DamageLabel>();
+  private castPlates = new Map<number, Timed>();
   private circle: Texture;
   private square: Texture;
   constructor(renderer: Renderer, readonly under: Container, readonly over: Container, private castLabels = over, private arenaTop = () => -Infinity) {
@@ -190,6 +194,41 @@ export class Fx {
         o.alpha = p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1;
       },
     });
+  }
+
+  /** A short group of hits shares one readout per target, including blocked and lingering damage. */
+  damage(target: number, at: () => { x: number; y: number }, amount: number, critical = false) {
+    if (amount <= 0) return;
+    const duration = 0.65;
+    let entry = this.damageLabels.get(target);
+    if (!entry || entry.label.destroyed) {
+      const label = new Text({
+        text: '', resolution: 2,
+        style: { fontFamily: FONT, fontSize: 36, stroke: { color: 0x1d140d, width: 5, join: 'round' } },
+      });
+      label.anchor.set(0.5);
+      this.over.addChild(label);
+      const timer: Timed = {
+        obj: label, life: duration, max: duration, update: (p, o: Text) => {
+          const point = at();
+          o.position.set(point.x, point.y - (8 + 38 * p) / DEPTH.k);
+          o.scale.set(1, 1 / DEPTH.k);
+          o.alpha = Math.min(1, (1 - p) * 4);
+        },
+      };
+      entry = { label, timer, amount: 0, critical: false };
+      this.damageLabels.set(target, entry);
+      this.timed.push(timer);
+    }
+    if (duration - entry.timer.life >= 0.28) {
+      entry.amount = 0;
+      entry.critical = false;
+      entry.timer.life = duration;
+    }
+    entry.amount += amount;
+    entry.critical ||= critical;
+    entry.label.text = `${Math.round(entry.amount)}${entry.critical ? '!' : ''}`;
+    entry.label.style.fill = entry.critical ? 0xffd23f : 0xffffff;
   }
 
   // ---------------- skill visuals ----------------
@@ -569,18 +608,24 @@ export class Fx {
    * Skill nameplate: a dark pill in the caster's colour that pops above its head and follows it,
    * so you can always tell who cast what. Specials get a gold, bigger plate.
    */
-  castPlate(at: () => { x: number; y: number }, name: string, color: number, special: boolean, caster: string, animate: boolean) {
+  castPlate(at: () => { x: number; y: number }, name: string, color: number, special: boolean, caster: string, animate: boolean, fighter: number, compact = false) {
+    const prior = this.castPlates.get(fighter);
+    if (prior) {
+      prior.obj.destroy({ children: true });
+      this.timed = this.timed.filter((entry) => entry !== prior);
+    }
     const c = new Container();
     const label = new Text({
       text: name.toUpperCase(),
-      style: { fontFamily: FONT, fontSize: special ? 44 : 34, fill: 0xffffff, letterSpacing: 1 },
+      style: { fontFamily: FONT, fontSize: compact ? special ? 29 : 24 : special ? 44 : 29, fill: 0xffffff, letterSpacing: 1 },
       resolution: 2,
     });
     label.anchor.set(0.5);
-    if (label.width > 265) label.scale.set(265 / label.width);
+    const maxWidth = compact ? 142 : 265;
+    if (label.width > maxWidth) label.scale.set(maxWidth / label.width);
     const kicker = new Text({
       text: `${special ? 'SPECIAL' : 'ACTIVE'} · ${caster}`,
-      style: { fontFamily: FONT, fontSize: 18, fill: special ? 0x211604 : 0xffffff, letterSpacing: 1 },
+      style: { fontFamily: FONT, fontSize: compact ? 12 : 16, fill: special ? 0x211604 : 0xffffff, letterSpacing: 1 },
       resolution: 2,
     });
     kicker.anchor.set(0.5);
@@ -594,15 +639,17 @@ export class Fx {
     c.addChild(bg, label, tab, kicker);
     if (special) this.castLabels.addChild(c);
     else this.castLabels.addChildAt(c, 0);
-    const dur = special ? 2.65 : 1.65;
-    this.timed.push({ obj: c, life: dur, max: dur, update: (p, o: Container) => {
+    const dur = special ? (compact ? 1.35 : 2.25) : 0.85;
+    const entry: Timed = { obj: c, life: dur, max: dur, update: (p, o: Container) => {
       const a = at();
       const pop = animate ? 1 + 0.14 * Math.max(0, 1 - p * 10) : 1;
       const lift = (h / 2 + 23) * pop / DEPTH.k;
       o.position.set(a.x, Math.max(a.y - lift, this.arenaTop() + lift + 6));
       o.scale.set(pop, pop / DEPTH.k);
       o.alpha = Math.min(1, (1 - p) * 6);
-    } });
+    } };
+    this.castPlates.set(fighter, entry);
+    this.timed.push(entry);
   }
 
   /** Lock-on reticle that follows the skill's target for a moment. */
@@ -687,7 +734,8 @@ export class Fx {
       const t = this.timed[i];
       t.life -= dt;
       if (t.life <= 0) {
-        t.obj.destroy();
+        for (const [fighter, plate] of this.castPlates) if (plate === t) this.castPlates.delete(fighter);
+        t.obj.destroy({ children: true });
         this.timed.splice(i, 1);
         continue;
       }
@@ -698,7 +746,9 @@ export class Fx {
   clear() {
     for (const p of this.particles) p.s.removeFromParent();
     this.particles = [];
-    for (const t of this.timed) t.obj.destroy();
+    for (const t of this.timed) t.obj.destroy({ children: true });
     this.timed = [];
+    this.damageLabels.clear();
+    this.castPlates.clear();
   }
 }

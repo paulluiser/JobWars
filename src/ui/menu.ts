@@ -148,36 +148,89 @@ export interface PvpView {
   error: string;
 }
 
+const ratingNumber = new Intl.NumberFormat();
+const matchDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const outcomes = { W: 'Win', L: 'Loss', D: 'Draw' } as const;
+
+function pvpRating(profile: Profile) {
+  const rank = rankOf(profile.mmr);
+  const next = RANKS[RANKS.indexOf(rank) + 1];
+  return `
+    <section class="pvp-rating" aria-label="PvP rating">
+      <div class="rating-identity">
+        ${rankEmblem(rank.name)}
+        <div><span class="rating-rank">${rank.name}</span><div class="rating-score"><b>${ratingNumber.format(profile.mmr)}</b> <span>MMR</span></div></div>
+      </div>
+      <div class="rating-progress">
+        ${next ? `<span>${ratingNumber.format(next.min - profile.mmr)} MMR to <b>${next.name}</b></span>
+          <progress aria-label="Progress to ${next.name}" value="${profile.mmr - rank.min}" max="${next.min - rank.min}"></progress>` : '<span>Top rank reached</span>'}
+      </div>
+      <dl class="rating-record">
+        <div><dt>Wins</dt><dd>${ratingNumber.format(profile.wins)}</dd></div>
+        <div><dt>Losses</dt><dd>${ratingNumber.format(profile.losses)}</dd></div>
+        <div><dt>Draws</dt><dd>${ratingNumber.format(profile.draws)}</dd></div>
+        <div><dt>Peak MMR</dt><dd>${ratingNumber.format(profile.peak)}</dd></div>
+      </dl>
+    </section>`;
+}
+
+function pvpHistory(profile: Profile) {
+  if (!profile.history.length) return '<p class="history-empty">No ranked matches yet.</p>';
+  const rows = profile.history.map(({ at, mode, result, delta, opp }) => {
+    const date = new Date(at);
+    const when = Number.isFinite(date.getTime()) ? `<time datetime="${date.toISOString()}">${matchDate.format(date)}</time>` : '';
+    const outcome = Object.hasOwn(outcomes, result) ? result : 'D';
+    const modeName = Object.hasOwn(PVP_MODES, mode) ? PVP_MODES[mode as PvpMode].name : 'PvP match';
+    return `<tr>
+      <td><span class="history-result h-${outcome}">${outcomes[outcome]}</span></td>
+      <td><b>${modeName}</b>${when}</td><td class="history-number">${ratingNumber.format(opp)}</td>
+      <td class="history-number history-${delta > 0 ? 'gain' : delta < 0 ? 'loss' : 'even'}">${delta > 0 ? '+' : ''}${ratingNumber.format(delta)}</td>
+    </tr>`;
+  }).join('');
+  return `<table aria-label="Ranked matches, newest first">
+    <thead><tr><th scope="col">Result</th><th scope="col">Format</th><th scope="col">Opponent MMR</th><th scope="col">MMR change</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+const matchFormats = [
+  { name: 'Duel', modes: ['classic1', 'gacha1'] },
+  { name: 'Tag Team', modes: ['classic2', 'gacha2'] },
+  { name: 'Battle Royale', modes: ['royaleClassic', 'royaleGacha'] },
+] as const;
+
 export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value?: string) => void, roomHosted = false) {
-  const r = rankOf(v.profile.mmr);
-  const next = RANKS[RANKS.indexOf(r) + 1];
+  const showingHistory = !v.busy && panel.querySelector<HTMLElement>('.pvp')?.dataset.view === 'history';
   const joinField = panel.querySelector<HTMLInputElement>('#joincode');
   const joinCode = joinField?.value ?? '';
   const joining = joinField && joinField === document.activeElement;
   const editingName = panel.querySelector('#playername') === document.activeElement;
   const mode = PVP_MODES[v.mode];
-  const modes = (Object.keys(PVP_MODES) as PvpMode[]).filter((m) => roomHosted || !PVP_MODES[m].royale).map((m) => {
-    const {tag, gacha, royale} = PVP_MODES[m];
-    return `<button class="match-mode" data-m="mode" data-v="${m}" aria-pressed="${m === v.mode}" ${v.busy ? 'disabled' : ''}>
-      <b>${gacha ? 'Gacha' : 'Classic'} ${royale ? '' : tag ? '2v2' : '1v1'}</b><span>${royale ? 'Battle Royale · 3–5' : tag ? 'Tag team' : 'Duel'}</span>
-    </button>`;
-  }).join('');
-  const hist = v.profile.history.slice(0, 6).map((h) => `<span class="h-${h.result}">${h.result} ${h.delta >= 0 ? '+' : ''}${h.delta}</span>`).join('') || '<em>No matches yet</em>';
+  const formats = matchFormats.filter(({ modes }) => roomHosted || !PVP_MODES[modes[0]].royale);
+  const selected = formats.find(({ modes }) => modes[0] === v.mode || modes[1] === v.mode) ?? formats[0];
+  const disabled = v.busy ? 'disabled' : '';
+  const formatButtons = formats.map(({ name, modes }) =>
+    `<button class="match-mode" data-m="format" data-v="${modes[0]}" aria-pressed="${selected.modes === modes}" ${disabled}>${name}</button>`).join('');
+  const ruleButtons = ['Classic', 'Gacha'].map((name, index) =>
+    `<button class="match-mode" data-m="rules" data-v="${index}" aria-pressed="${Number(mode.gacha) === index}" ${disabled}>${name}</button>`).join('');
   show(panel, `
-    <section class="pvp desk-screen">
+    <section class="pvp desk-screen" data-view="${showingHistory ? 'history' : 'play'}">
       <header class="desk-head"><button class="back" data-m="back" aria-label="Menu">Menu</button><h2>Player vs Player</h2></header>
-      <div class="desk-sheet match-desk">
+      ${pvpRating(v.profile)}
+      <div class="pvp-views" role="group" aria-label="PvP view">
+        <button data-m="play" aria-pressed="${!showingHistory}" aria-controls="pvp-play">Play</button>
+        <button data-m="history" aria-pressed="${showingHistory}" aria-controls="pvp-history" ${v.busy ? 'disabled' : ''}>Match history</button>
+      </div>
+      <div id="pvp-play" class="desk-sheet match-desk" ${showingHistory ? 'hidden' : ''}>
         <div class="match-setup">
           <section aria-labelledby="format-title">
             <h3 id="format-title">Match format</h3>
-            <div class="match-modes">${modes}</div>
+            <div class="match-modes">
+              <div class="match-row" role="group" aria-label="Match format">${formatButtons}</div>
+              <div class="match-row" role="group" aria-label="Match rules">${ruleButtons}</div>
+            </div>
             <p class="match-description">${mode.royale ? `${mode.blurb} Unranked.` : mode.gacha ? `Draft a card every ${GACHA.surgeEvery} seconds.` : 'Fighters battle without cards.'}</p>
           </section>
-          <div class="match-record">
-            <div class="record-rank">${rankEmblem(r.name)}<div><b>${r.name} · ${v.profile.mmr} MMR</b><span>${next ? `${next.min - v.profile.mmr} to ${next.name}` : 'Top rank'}</span></div></div>
-            <p>${v.profile.wins} wins · ${v.profile.losses} losses · ${v.profile.draws} draws · peak ${v.profile.peak}</p>
-            <div class="pr-hist" aria-label="Recent match results">${hist}</div>
-          </div>
         </div>
         <section class="match-actions" aria-labelledby="lobby-title">
           <h3 id="lobby-title">${mode.royale ? 'Invite your friends' : 'Find an opponent'}</h3>
@@ -196,7 +249,26 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
           <p class="lobby-note">Lobby codes use the host’s match format. ${roomHosted ? 'Rooms can reconnect after a brief disconnect.' : 'Both players need to keep this page open.'}</p>
         </section>
       </div>
+      <section id="pvp-history" class="desk-sheet pvp-history" aria-label="Match history" tabindex="0" ${showingHistory ? '' : 'hidden'}>${pvpHistory(v.profile)}</section>
     </section>`, (t) => {
+    if (t.dataset.m === 'play' || t.dataset.m === 'history') {
+      const history = t.dataset.m === 'history';
+      panel.querySelector<HTMLElement>('.pvp')!.dataset.view = t.dataset.m;
+      panel.querySelector<HTMLElement>('#pvp-play')!.hidden = history;
+      panel.querySelector<HTMLElement>('#pvp-history')!.hidden = !history;
+      panel.querySelector('[data-m="play"]')!.setAttribute('aria-pressed', String(!history));
+      panel.querySelector('[data-m="history"]')!.setAttribute('aria-pressed', String(history));
+      return;
+    }
+    if (t.dataset.m === 'format') {
+      const format = formats.find(({ modes }) => modes[0] === t.dataset.v);
+      if (format) act('mode', format.modes[mode.gacha ? 1 : 0]);
+      return;
+    }
+    if (t.dataset.m === 'rules') {
+      act('mode', selected.modes[t.dataset.v === '1' ? 1 : 0]);
+      return;
+    }
     if (t.dataset.m === 'join') act('join', (panel.querySelector('#joincode') as HTMLInputElement).value);
     else act(t.dataset.m!, t.dataset.v);
   });

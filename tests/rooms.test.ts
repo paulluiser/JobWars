@@ -150,7 +150,7 @@ describe('authoritative room', () => {
 
   it('detects a Gacha knockout at an unreported surge boundary', () => {
     const room = locked('gacha1', 'builder');
-    room.seed = 18;
+    room.seed = 29;
     for (let phase = 0; phase < 18 && room.phase !== 'result'; phase++) {
       room.elapse(room.alarmAt);
     }

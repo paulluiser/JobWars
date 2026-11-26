@@ -53,8 +53,8 @@ export function forTag(d: FighterDef): FighterDef {
  * Deterministic combat simulation. Knows nothing about rendering.
  *
  * Fighters are balls: they bounce around the arena at a constant cruise speed and
- * never steer. They swing their weapon continuously on a fixed rhythm. Every swing
- * that reaches the foe is resolved on an attack table rolled from both fighters'
+ * never steer. They start swings when a foe is in or about to enter reach. Every
+ * swing that reaches the foe is resolved on an attack table rolled from both fighters'
  * stats: dodge → miss → block (parry / guard break) → crit → hit.
  * On top of that each job has a kit (src/sim/kits.ts): a passive, an active skill on
  * a cooldown, and a special that fires whenever its rage bar fills (dealing and taking damage).
@@ -469,6 +469,23 @@ export class Sim {
     const b = this.foeOf(f);
     if (!b || this.untargetable(b)) return false;
     return this.dist(f, b) - b.def.radius <= f.def.range * slack;
+  }
+
+  canStartSwing(f: Fighter) {
+    const b = this.foeOf(f);
+    if (!b || this.untargetable(b)) return false;
+    const dx = b.x - f.x, dy = b.y - f.y;
+    const reach = f.def.range + b.def.radius;
+    if (dhypot(dx, dy) <= reach) return true;
+
+    const vx = b.vx - f.vx, vy = b.vy - f.vy;
+    const approach = -(dx * vx + dy * vy);
+    if (approach <= 0) return false;
+
+    // Use the short swing wind-up even for charges, when the bounce path is still predictable.
+    const windup = f.def.windup / this.rhythmOf(f);
+    const closest = Math.min(windup, approach / (vx * vx + vy * vy));
+    return dhypot(dx + vx * closest, dy + vy * closest) <= reach;
   }
 
   // ---------- actions ----------

@@ -86,7 +86,7 @@ const chef: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('cone', f.idx, foe.idx, f.x, f.y, angleTo(f, foe), 0.4);
-      sim.skillHit(f, foe, 1.4, { dodgeable: true, knock: 260, statuses: [{ kind: 'burn', duration: 3 }] });
+      sim.skillHit(f, foe, 1.25, { dodgeable: true, knock: 260, statuses: [{ kind: 'burn', duration: 2.5 }] });
     },
   },
   special: {
@@ -120,7 +120,7 @@ const firefighter: Kit = {
     if (!foe) return;
     sim.fx('stream', f.idx, foe.idx, f.x, f.y, angleTo(f, foe), 0.25);
     if (gap(sim, f, foe) <= 380) {
-      sim.skillHit(f, foe, 0.3, { canCrit: false, knock: 170, statuses: [{ kind: 'wet', duration: 4 }] });
+      sim.skillHit(f, foe, 0.36, { canCrit: false, knock: 170, statuses: [{ kind: 'wet', duration: 4 }] });
     }
   },
   special: {
@@ -153,7 +153,7 @@ const electrician: Kit = {
     castTime: 0.3,
     canCast: (sim, f) => sim.hazards.filter((h) => h.owner === f.idx && h.kind === 'trap').length < 2,
     cast(sim, f) {
-      sim.spawnHazard({ kind: 'trap', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 40, life: 8 });
+      sim.spawnHazard({ kind: 'trap', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 44, life: 9 });
     },
   },
   hazardTick(sim, h) {
@@ -165,7 +165,7 @@ const electrician: Kit = {
       sim.emit({ type: 'hazard', action: 'trigger', id: h.id, kind: h.kind, x: h.x, y: h.y });
       sim.fx('zap', owner.idx, e.idx, e.x, e.y);
       const d = dhypot(e.x - h.x, e.y - h.y) || 1;
-      sim.skillHit(owner, e, 1.7, { canCrit: false, knock: 200, dir: { x: (e.x - h.x) / d, y: (e.y - h.y) / d }, stun: sim.has(e, 'wet') ? 2 : 1 });
+      sim.skillHit(owner, e, 2.05, { canCrit: false, knock: 200, dir: { x: (e.x - h.x) / d, y: (e.y - h.y) / d }, stun: sim.has(e, 'wet') ? 2 : 1 });
       return;
     }
   },
@@ -206,8 +206,8 @@ const nurse: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('zap', f.idx, foe.idx, foe.x, foe.y);
-      sim.skillHit(f, foe, 1.4, { dodgeable: true, stun: 0.8, knock: 160 });
-      sim.heal(f, pct(f, 0.05));
+      sim.skillHit(f, foe, 1.65, { dodgeable: true, stun: 0.9, knock: 160 });
+      sim.heal(f, pct(f, 0.065));
     },
   },
   special: {
@@ -259,7 +259,7 @@ const courier: Kit = {
     f.kit.rammed = 1;
     const mult = 1 + 0.1 * (f.kit.momentum ?? 0);
     f.kit.momentum = 0;
-    sim.skillHit(f, foe, 1.5 * mult, { dodgeable: true, knock: 520 });
+    sim.skillHit(f, foe, 1.25 * mult, { dodgeable: true, knock: 480 });
   },
   special: {
     castTime: 0.4,
@@ -312,12 +312,12 @@ const fisher: Kit = {
     if (dhypot(foe.x - h.x, foe.y - h.y) > h.r + foe.def.radius) return;
     h.dead = true;
     sim.emit({ type: 'hazard', action: 'trigger', id: h.id, kind: h.kind, x: h.x, y: h.y });
-    if (sim.skillHit(owner, foe, 1.4, { dodgeable: true, knock: 0 })) {
+    if (sim.skillHit(owner, foe, 1.2, { dodgeable: true, knock: 0 })) {
       const a = datan2(owner.y - foe.y, owner.x - foe.x);
       foe.vx = dcos(a) * 700;
       foe.vy = dsin(a) * 700;
       sim.fx('pull', owner.idx, foe.idx, foe.x, foe.y, a, 0.4);
-      sim.applyStun(foe, 0.5);
+      sim.applyStun(foe, 0.35);
     }
   },
   special: {

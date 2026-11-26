@@ -1,8 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { ROSTER } from '../src/data/roster';
 import { Game } from '../src/game';
+import { Hud } from '../src/ui/hud';
 import { FighterView, ROYALE_FIGHTER_SCALE } from '../src/render/fighterView';
-import type { Fx } from '../src/render/fx';
+import { Fx } from '../src/render/fx';
+import { Container, Text, Texture, type Renderer } from 'pixi.js';
 import { Juice } from '../src/render/juice';
 import { Sim } from '../src/sim/sim';
 import type { SimEvent } from '../src/sim/types';
@@ -12,7 +14,7 @@ function battle() {
   const sfx = {
     update: vi.fn(), charge: vi.fn(), mood: vi.fn(), tick: vi.fn(), heartbeat: vi.fn(), special: vi.fn(), bell: vi.fn(), skill: vi.fn(), jingle: vi.fn(),
   };
-  const hud = { update: vi.fn(), skillFired: vi.fn(), callout: vi.fn() };
+  const hud = { update: vi.fn(), skillFired: vi.fn(), callout: vi.fn(), announce: vi.fn() };
   const castPlate = vi.fn();
   const cutscene = { play: vi.fn() };
   const intro = { stop: vi.fn() };
@@ -145,4 +147,42 @@ it('keeps compact Royale sprites visible through repeated 100ms rendering frames
     expect(view.root.width).toBeLessThan(width * 1.8);
   }
   view.root.destroy({ children: true });
+});
+
+it('combines volley damage per target and preserves the critical indicator', () => {
+  const under = new Container();
+  const over = new Container();
+  const fx = new Fx({ generateTexture: () => Texture.EMPTY } as unknown as Renderer, under, over);
+  const point = () => ({ x: 100, y: 100 });
+  fx.damage(0, point, 34);
+  fx.update(0.1);
+  fx.damage(0, point, 22, true);
+  fx.damage(1, point, 15);
+  expect(over.children.map((child) => (child as Text).text)).toEqual(['56!', '15']);
+  fx.update(0.4);
+  fx.damage(0, point, 10);
+  expect(over.children.map((child) => (child as Text).text)).toEqual(['10', '15']);
+  fx.clear();
+  expect(over.children).toHaveLength(0);
+});
+
+it('lets an elimination interrupt a special announcement and keeps subsequent large cues out of the same slot', () => {
+  const callout = vi.fn();
+  const hud = Object.assign(Object.create(Hud.prototype), { callout, announcement: 0, announcementPriority: 0 }) as Hud;
+  hud.announce('First special', '#ffd23f', 1);
+  hud.announce('Second special', '#ffd23f', 1);
+  hud.announce('Elimination', '#ff856e', 2);
+  hud.announce('Third special', '#ffd23f', 1);
+  expect(callout.mock.calls.map(([text]) => text)).toEqual(['First special', 'Elimination']);
+});
+
+it('gives both Royale specials compact fighter cues without opening overlapping cutscenes', () => {
+  const { game, sim, castPlate, cutscene, hud } = battle();
+  sim.opts.royale = true;
+  game.roomLink = {};
+  game.juice.enabled = false;
+  game.handle(sim.fighters.map((fighter) => ({ type: 'skill', a: fighter.idx, kind: 'special', name: fighter.def.special.name })));
+  expect(cutscene.play).not.toHaveBeenCalled();
+  expect(castPlate.mock.calls.map((args) => args.slice(-2))).toEqual([[0, true], [1, true]]);
+  expect(hud.announce).toHaveBeenCalledTimes(2);
 });

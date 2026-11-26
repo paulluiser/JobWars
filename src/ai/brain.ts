@@ -3,11 +3,10 @@ import { kitOf } from '../sim/kits';
 import type { Fighter } from '../sim/types';
 
 /**
- * Fighters don't steer and don't time their swings: they bounce, and swing on a
- * continuous rhythm. The few choices they do make, in priority order:
+ * Fighters bounce without steering. Their choices, in priority order:
  *   1. Special: fire it the moment the rage bar is full, from almost any state.
  *   2. Active skill: when it's off cooldown and the kit's condition holds.
- *   3. Each swing cycle: a normal swing, or a charged blow (from `chargeChance`).
+ *   3. When the foe is in reach or closing into it: a swing or a charged blow.
  * Whether a swing connects is decided by reach and the attack table in the sim.
  */
 export function think(sim: Sim, f: Fighter) {
@@ -21,7 +20,7 @@ export function think(sim: Sim, f: Fighter) {
     return;
   }
   if (f.attackCd > 0 || sim.has(f, 'disarm') || sim.has(f, 'charm')) return;
-  if (kitOf(f).noSwing?.(sim, f)) return;
+  if (kitOf(f).noSwing?.(sim, f) || !sim.canStartSwing(f)) return;
   if (sim.rng.chance(f.def.chargeChance)) sim.startCharge(f);
   else sim.startAttack(f);
 }

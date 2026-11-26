@@ -43,7 +43,7 @@ Why it's fun to watch: fights swing back and forth. Every character has a **come
 Like ball-battle sims, **nothing is steered**:
 
 * **Movement is ball physics.** Each fighter launches in a random direction at its **cruise speed** and bounces off the box walls (with a small random spin on every bounce so paths never repeat) and off each other (elastic bump, heavier fighters push lighter ones). Hits add knockback on top; speed relaxes back to cruise speed. Fighters only slow down (charging, stunned), never stop.
-* **Attacking is continuous.** Every fighter swings on a fixed rhythm (wind-up → strike → recover → cooldown), forever, whether or not the foe is close. A swing only matters if the foe is **within reach** at the moment it lands.
+* **Attacks start near the foe.** After the cooldown, a fighter starts a swing if the foe is within reach or their current paths could bring them into reach during the wind-up. The foe must still be **within reach** at impact.
 * **Hitting is chance.** A swing in reach rolls the **attack table** from both fighters' stats, in this order:
   1. **Dodge**: the defender's *evasion* (hops aside). Not while stunned or charging.
   2. **Miss**: the attacker's *accuracy*, falling off by up to 35% at the very edge of reach.
@@ -94,7 +94,7 @@ The triangle survives as **odds**, not AI timing:
       CHARGE ATTACK ◀─────────┘
 ```
 
-* **Basic attack:** the nonstop swings. A clean hit on a charging fighter **interrupts** the charge (0.45 s stagger).
+* **Basic attack:** a quick swing. A clean hit on a charging fighter **interrupts** the charge (0.45 s stagger).
 * **Block:** rolled from block chance. Blocked hits deal 30% and drain 25 Guard. **Guard Break** at 0 Guard: stunned 1.2 s, big "BREAK!" pop.
   * **Parry:** a share of blocks are parries: no damage, the attacker is staggered 0.6 s. Cyan "PARRY!" flash and a bell-like SFX.
 * **Charge attack:** wind-up with a pulsing glow and rising hum, held until in reach, then 210–240% ATK. If the defender rolls a block, **the charge breaks it** (guard break), so "charge beats block" is never ambiguous. Charging fighters can't dodge or block, which is the risk.

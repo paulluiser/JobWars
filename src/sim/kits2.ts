@@ -59,7 +59,7 @@ const farmer: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('slashx', f.idx, foe.idx, f.x, f.y, angleTo(f, foe), 0.3, 0xd9e6a0);
-      sim.skillHit(f, foe, 1.4, { dodgeable: true, statuses: [{ kind: 'slow', duration: 2, value: 0.3 }] });
+      sim.skillHit(f, foe, 1.65, { dodgeable: true, statuses: [{ kind: 'slow', duration: 2.25, value: 0.3 }] });
       for (const c of mine(sim, f, 'crop')) if (c.age >= 6 && near(f, c, 220)) {
         c.dead = true;
         sim.heal(f, pct(f, 0.06));
@@ -93,13 +93,13 @@ const builder: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       const p = clampArena((f.x + foe.x) / 2, (f.y + foe.y) / 2, 50);
-      sim.spawnHazard({ kind: 'wall', owner: f.idx, x: p.x, y: p.y, vx: 0, vy: 0, r: 34, life: 5, solid: true, data: { hp: pct(f, 0.3) } });
+      sim.spawnHazard({ kind: 'wall', owner: f.idx, x: p.x, y: p.y, vx: 0, vy: 0, r: 34, life: 6, solid: true, data: { hp: pct(f, 0.3) } });
     },
   },
   onSolidHit(sim, h, f, speed) {
     if (f.team === sim.fighters[h.owner].team) return;
     if (speed > 300) {
-      sim.applyStun(f, 0.8);
+      sim.applyStun(f, 0.9);
       sim.note(f, 'BONK!', 0xffd23f);
     }
   },
@@ -157,7 +157,7 @@ const miner: Kit = {
     f.px = f.x;
     f.py = f.y;
     sim.fx('burst', f.idx, foe.idx, f.x, f.y, 0, 0.4, 0x8a7560, 'dust');
-    sim.skillHit(f, foe, 1.6, { dodgeable: true, knock: 260, dir: { x: 0, y: -1 }, stun: 0.75 });
+    sim.skillHit(f, foe, 2.1, { dodgeable: true, knock: 260, dir: { x: 0, y: -1 }, stun: 0.75 });
   },
   special: {
     castTime: 0.5,
@@ -189,9 +189,9 @@ const welder: Kit = {
       if (!foe) return;
       sim.fx('cone', f.idx, foe.idx, f.x, f.y, angleTo(f, foe), 0.4);
       volley(sim, f, 3, 0.12, (t) => {
-        if (inReach(sim, f, t, 1.4)) sim.skillHit(f, t, 0.5, { dodgeable: true, canCrit: false, knock: 60, statuses: [{ kind: 'burn', duration: 3 }] });
+        if (inReach(sim, f, t, 1.4)) sim.skillHit(f, t, 0.45, { dodgeable: true, canCrit: false, knock: 60, statuses: [{ kind: 'burn', duration: 2.5 }] });
       });
-      addHeat(sim, f, 30);
+      addHeat(sim, f, 25);
     },
   },
   special: {
@@ -251,7 +251,7 @@ const plumber: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.2, 0xd62828);
-      if (sim.skillHit(f, foe, 1, { dodgeable: true, knock: 0, statuses: [{ kind: 'silence', duration: 1.5 }] })) {
+      if (sim.skillHit(f, foe, 0.75, { dodgeable: true, knock: 0, statuses: [{ kind: 'silence', duration: 1 }] })) {
         const a = angleTo(foe, f);
         foe.vx = dcos(a) * 420;
         foe.vy = dsin(a) * 420;
@@ -282,7 +282,7 @@ const mechanic: Kit = {
     castTime: 0.5,
     canCast: (sim, f) => mine(sim, f, 'turret').length === 0,
     cast(sim, f) {
-      sim.spawnHazard({ kind: 'turret', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 24, life: 8 });
+      sim.spawnHazard({ kind: 'turret', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 24, life: 9 });
     },
   },
   hazardTick(sim, h) {
@@ -294,7 +294,7 @@ const mechanic: Kit = {
     const t = sim.foeOf(o);
     if (!t || !sim.alive(o) || !near(h, t, 380)) return;
     sim.fx('shot', o.idx, t.idx, h.x, h.y - 30, 0, 0.12, 0xffd23f);
-    if (sim.skillHit(o, t, 0.4, { canCrit: false, knock: 40 })) {
+    if (sim.skillHit(o, t, 0.46, { canCrit: false, knock: 40 })) {
       const s = sim.status(t, 'slow');
       sim.applyStatus(t, { kind: 'slow', duration: 3, value: Math.min(0.3, (s?.value ?? 0) + 0.05) }, o.idx);
     }
@@ -337,7 +337,7 @@ const engineer: Kit = {
       if (!foe) return;
       // the beam lands where the foe IS now; the bounce decides if it's still there in 0.8 s
       const spot = { x: foe.x, y: foe.y };
-      sim.spawnHazard({ kind: 'beam', owner: f.idx, x: spot.x, y: spot.y, vx: 0, vy: 0, r: 60, life: 0.8 });
+      sim.spawnHazard({ kind: 'beam', owner: f.idx, x: spot.x, y: spot.y, vx: 0, vy: 0, r: 64, life: 0.8 });
     },
   },
   hazardTick(sim, h) {
@@ -345,7 +345,7 @@ const engineer: Kit = {
     const o = sim.fighters[h.owner];
     sim.fx('drop', o.idx, o.idx, h.x, h.y, 0, 0.01, 0x9aa3ad, 'dust');
     for (const e of sim.enemiesOf(o)) if (near(e, h, h.r + e.def.radius * 0.5)) {
-      sim.skillHit(o, e, 1.8, { stun: 1, knock: 100, dir: { x: 0, y: 1 } });
+      sim.skillHit(o, e, 2.35, { stun: 1, knock: 100, dir: { x: 0, y: 1 } });
       sim.applyStatus(e, { kind: 'mark', duration: 4 }, o.idx);
     }
   },
@@ -380,7 +380,7 @@ const pilot: Kit = {
     cast(sim, f) {
       volley(sim, f, 3, 0.15, (t) => {
         sim.fx('shot', f.idx, t.idx, t.x, t.y, 0, 0.18, 0xffb347, 'fire');
-        sim.skillHit(f, t, 0.8, { dodgeable: true, knock: 90, statuses: [{ kind: 'blind', duration: 2 }] });
+        sim.skillHit(f, t, 0.96, { dodgeable: true, knock: 90, statuses: [{ kind: 'blind', duration: 2 }] });
       });
     },
   },
@@ -410,8 +410,8 @@ const merchant: Kit = {
       const heads = sim.rng.chance(0.5);
       sim.note(f, heads ? 'HEADS!' : 'TAILS', 0xffd23f);
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.2, 0xffd23f, 'coins');
-      if (heads) sim.skillHit(f, foe, 2, { dodgeable: true });
-      else if (sim.skillHit(f, foe, 1, { dodgeable: true })) {
+      if (heads) sim.skillHit(f, foe, 2.15, { dodgeable: true });
+      else if (sim.skillHit(f, foe, 1.1, { dodgeable: true })) {
         const buff = foe.statuses.find((s) => ['spicy', 'hearty', 'light', 'shield', 'haste', 'empower', 'fortify'].includes(s.kind));
         if (buff) {
           foe.statuses = foe.statuses.filter((s) => s !== buff);
@@ -484,7 +484,7 @@ const waiter: Kit = {
     for (const e of sim.enemiesOf(o)) if (near(e, h, h.r + e.def.radius)) {
       h.data.cool = h.age + 0.3;
       h.data.hits--;
-      sim.skillHit(o, e, 0.9, { dodgeable: true, knock: 150, statuses: [{ kind: 'slow', duration: 2, value: 0.2 }] });
+      sim.skillHit(o, e, 0.75, { dodgeable: true, knock: 150, statuses: [{ kind: 'slow', duration: 1.5, value: 0.15 }] });
       // ricochet off the target toward its other side
       h.vx = -h.vx;
       h.vy = -h.vy;
@@ -518,7 +518,7 @@ const cleaner: Kit = {
     castTime: 0.4,
     canCast: (sim, f, foe) => within(sim, f, foe, 300),
     cast(sim, f) {
-      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 110, life: 5, data: { type: 0 } });
+      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 115, life: 5.5, data: { type: 0 } });
     },
   },
   hazardTick(sim, h) {
@@ -555,12 +555,12 @@ function zoneTick(sim: Sim, h: Hazard) {
         }
         break;
       case 1:
-        sim.applyStatus(e, { kind: 'armorBreak', duration: 0.6, value: 0.2 }, o.idx);
+        sim.applyStatus(e, { kind: 'armorBreak', duration: 0.6, value: 0.25 }, o.idx);
         if (pulse && (h.data.p = (h.data.p ?? 0) + 1) % 2 === 0) sim.applyStatus(e, { kind: 'poison', duration: 4 }, o.idx);
         break;
       default:
         if (!pulse) break;
-        sim.skillHit(o, e, 0.3, { canCrit: false, knock: 30 });
+        sim.skillHit(o, e, 0.27, { canCrit: false, knock: 30 });
         if (h.data.type === 2) sim.applyStatus(e, { kind: 'burn', duration: 2 }, o.idx);
         if (h.data.type === 3) sim.applyStatus(e, { kind: 'slow', duration: 1, value: 0.2 }, o.idx);
         if (h.data.type === 4) sim.stagger(e, 0.2);
@@ -577,7 +577,7 @@ const tailor: Kit = {
     cast(sim, f) {
       volley(sim, f, 5, 0.08, (t) => {
         sim.fx('shot', f.idx, t.idx, t.x, t.y, 0, 0.12, 0xdfe6ee, 'needle');
-        if (sim.skillHit(f, t, 0.4, { dodgeable: true, canCrit: false, knock: 30, statuses: [{ kind: 'bleed', duration: 3 }] })) thread(sim, f, t, 1);
+        if (sim.skillHit(f, t, 0.45, { dodgeable: true, canCrit: false, knock: 30, statuses: [{ kind: 'bleed', duration: 3.25 }] })) thread(sim, f, t, 1);
       });
     },
   },
@@ -621,7 +621,7 @@ const barber: Kit = {
       if (!foe) return;
       sim.fx('stream', f.idx, foe.idx, f.x, f.y, angleTo(f, foe), 0.4);
       foe.statuses = foe.statuses.filter((s) => s.kind !== 'shield');
-      sim.skillHit(f, foe, 1, { dodgeable: true, knock: 520 });
+      sim.skillHit(f, foe, 1.1, { dodgeable: true, knock: 520 });
     },
   },
   special: {
@@ -656,7 +656,7 @@ const doctor: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.22, 0x9fd8ff, 'needle');
-      if (sim.skillHit(f, foe, 0.8, { dodgeable: true, knock: 60 })) sim.applyStatus(foe, { kind: 'sleep', duration: 1.5 }, f.idx);
+      if (sim.skillHit(f, foe, 0.75, { dodgeable: true, knock: 60 })) sim.applyStatus(foe, { kind: 'sleep', duration: 1.35 }, f.idx);
     },
   },
   special: {
@@ -690,7 +690,7 @@ const scientist: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('drop', f.idx, foe.idx, foe.x, foe.y, 0, 0.3, 0x80ff9a, 'flask');
-      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: foe.x, y: foe.y, vx: 0, vy: 0, r: 90, life: 4, data: { type: 1 } });
+      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: foe.x, y: foe.y, vx: 0, vy: 0, r: 95, life: 4, data: { type: 1 } });
     },
   },
   hazardTick(sim, h) {
@@ -722,7 +722,7 @@ const teacher: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.2, 0xffffff);
-      sim.skillHit(f, foe, 1.2, { dodgeable: true, knock: 120, statuses: [{ kind: 'confuse', duration: 2 }] });
+      sim.skillHit(f, foe, 1.05, { dodgeable: true, knock: 120, statuses: [{ kind: 'confuse', duration: 1.65 }] });
     },
   },
   special: {
@@ -765,9 +765,9 @@ const programmer: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.25, 0x4cc9f0);
-      if (sim.skillHit(f, foe, 1, { dodgeable: true, knock: 80 })) {
+      if (sim.skillHit(f, foe, 1.25, { dodgeable: true, knock: 80 })) {
         foe.activeCd += 2;
-        sim.applyStatus(foe, { kind: 'glitch', duration: 3 }, f.idx);
+        sim.applyStatus(foe, { kind: 'glitch', duration: 3.4 }, f.idx);
       }
     },
   },
@@ -810,7 +810,7 @@ const accountant: Kit = {
       foe.statuses = foe.statuses.filter((s) => !buffs.includes(s));
       if (buffs.length) sim.note(foe, `TAXED ×${buffs.length}`, 0x43aa8b);
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.2, 0x43aa8b);
-      sim.skillHit(f, foe, 1 + 0.6 * buffs.length, { dodgeable: true });
+      sim.skillHit(f, foe, 1.08 + 0.6 * buffs.length, { dodgeable: true });
     },
   },
   special: {
@@ -842,7 +842,7 @@ const lawyer: Kit = {
     if ((f.kit.contemptUntil ?? 0) > sim.t && f.kit.contemptOn === caster.idx + 1) {
       f.kit.contemptUntil = 0;
       sim.note(caster, 'CONTEMPT!', 0xe9c46a);
-      sim.skillHit(f, caster, 2, { knock: 200 });
+      sim.skillHit(f, caster, 2.25, { knock: 200 });
     }
   },
   active: {
@@ -852,8 +852,8 @@ const lawyer: Kit = {
       if (!foe) return;
       sim.fx('slashx', f.idx, foe.idx, foe.x, foe.y, datan2(foe.y - f.y, foe.x - f.x), 0, 0xe9c46a);
       sim.fx('drop', f.idx, foe.idx, foe.x, foe.y, 0, 0.02, 0x8a5a2b, 'gavel');
-      if (sim.skillHit(f, foe, 1.3, { dodgeable: true })) {
-        f.kit.contemptUntil = sim.t + 4;
+      if (sim.skillHit(f, foe, 1.7, { dodgeable: true })) {
+        f.kit.contemptUntil = sim.t + 4.5;
         f.kit.contemptOn = foe.idx + 1;
         sim.note(foe, 'ON TRIAL', 0xe9c46a);
       }
@@ -883,7 +883,7 @@ const police: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       sim.fx('shot', f.idx, foe.idx, foe.x, foe.y, 0, 0.2, 0xc0c7d0);
-      if (sim.skillHit(f, foe, 0.6, { dodgeable: true, knock: 0 })) {
+      if (sim.skillHit(f, foe, 0.9, { dodgeable: true, knock: 0 })) {
         sim.applyStatus(foe, { kind: 'root', duration: 1.5 }, f.idx);
         sim.applyStatus(foe, { kind: 'disarm', duration: 2 }, f.idx);
       }
@@ -920,7 +920,7 @@ const soldier: Kit = {
     cast(sim, f, foe) {
       if (!foe) return;
       const a = angleTo(f, foe);
-      sim.spawnHazard({ kind: 'grenade', owner: f.idx, x: f.x, y: f.y, vx: dcos(a) * sim.dist(f, foe) / 0.6, vy: dsin(a) * sim.dist(f, foe) / 0.6, r: 90, life: 0.6 });
+      sim.spawnHazard({ kind: 'grenade', owner: f.idx, x: f.x, y: f.y, vx: dcos(a) * sim.dist(f, foe) / 0.6, vy: dsin(a) * sim.dist(f, foe) / 0.6, r: 98, life: 0.6 });
     },
   },
   hazardTick(sim, h) {
@@ -929,7 +929,7 @@ const soldier: Kit = {
     sim.fx('explosion', o.idx, o.idx, h.x, h.y, 0, 0.5, 0xff8a2a, 'fire');
     for (const e of sim.enemiesOf(o)) if (near(e, h, h.r + e.def.radius)) {
       const d = dhypot(e.x - h.x, e.y - h.y) || 1;
-      sim.skillHit(o, e, 1.7, { knock: 520, dir: { x: (e.x - h.x) / d, y: (e.y - h.y) / d }, statuses: [{ kind: 'bleed', duration: 3 }] });
+      sim.skillHit(o, e, 2.25, { knock: 520, dir: { x: (e.x - h.x) / d, y: (e.y - h.y) / d }, statuses: [{ kind: 'bleed', duration: 3.5 }] });
     }
   },
   special: {
@@ -980,7 +980,7 @@ const artist: Kit = {
     canCast: (sim, f, foe) => within(sim, f, foe, 300),
     cast(sim, f) {
       const c = (f.kit.color ?? 0) % 3;
-      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 100, life: 4, data: { type: 2 + c } });
+      sim.spawnHazard({ kind: 'zone', owner: f.idx, x: f.x, y: f.y, vx: 0, vy: 0, r: 100, life: 3.5, data: { type: 2 + c } });
     },
   },
   hazardTick(sim, h) {
@@ -1025,7 +1025,7 @@ const musician: Kit = {
     canCast: (sim, f, foe) => within(sim, f, foe, 260),
     cast(sim, f, foe) {
       sim.fx('shockwave', f.idx, f.idx, f.x, f.y, 0, 0.5, 0xef233c);
-      if (foe && within(sim, f, foe, 280)) sim.skillHit(f, foe, 1.5, { dodgeable: true, knock: 480, statuses: [{ kind: 'silence', duration: 1 }] });
+      if (foe && within(sim, f, foe, 280)) sim.skillHit(f, foe, 1.55, { dodgeable: true, knock: 480, statuses: [{ kind: 'silence', duration: 1.1 }] });
     },
   },
   special: {
@@ -1066,7 +1066,7 @@ const athlete: Kit = {
       h.data.cool = h.age + 0.3;
       h.data.hits--;
       const d = dhypot(h.vx, h.vy) || 1;
-      sim.skillHit(o, e, 1.3, { dodgeable: true, knock: 560, dir: { x: h.vx / d, y: h.vy / d } });
+      sim.skillHit(o, e, 0.85, { dodgeable: true, knock: 400, dir: { x: h.vx / d, y: h.vy / d } });
       h.vx = -h.vx;
       h.vy = -h.vy;
     }

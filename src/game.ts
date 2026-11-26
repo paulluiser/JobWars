@@ -1474,29 +1474,32 @@ export class Game {
     const fx = this.scene.fx;
     const on = j.enabled;
     const F = this.sim.fighters;
+    const royale = !!this.sim.opts.royale;
     const view = (i: number) => this.scene.views[i];
     const sc = (i: number) => this.scene.views[i].visualSize / DEPTH.k;
+    const showDamage = (target: number, amount: number, critical = false) =>
+      fx.damage(target, () => view(target).point('chest'), amount, critical);
 
     for (let k = 0; k < events.length; k++) {
       const e = events[k];
       switch (e.type) {
         case 'swing': {
-          // continuous swings: full trail when it reaches, a faint one when it cuts air
+          // Keep the actual wind-up and swing pose readable on misses.
           const a = F[e.a];
           const sh = view(e.a).point('shoulder');
           this.sfx.whoosh(e.heavy, e.inReach ? 1 : 0.45, a.def.id);
-          if (on) fx.slash(sh.x, sh.y, a.face, a.def.range * 0.8, e.heavy ? 0xffc04a : 0xffffff, e.heavy, e.inReach || e.heavy ? 1 : 0.4);
+          if (on && e.heavy && e.inReach) fx.slash(sh.x, sh.y, a.face, a.def.range * 0.68, 0xffc04a, true, royale ? 0.6 : 0.9);
           break;
         }
         case 'miss': {
           this.sfx.miss();
-          fx.text(e.x, e.y - HEIGHT * sc(e.b) - 50, 'MISS', { color: 0xb8b0a4, size: on ? 30 : 22, toss: false, dur: 0.7 });
+          if (!royale) fx.text(e.x, e.y - HEIGHT * sc(e.b) - 50, 'MISS', { color: 0xb8b0a4, size: on ? 30 : 22, toss: false, dur: 0.7 });
           break;
         }
         case 'bounce': {
           view(e.a).wallSquash(e.nx, e.ny, e.speed);
           this.sfx.bounce(e.speed);
-          if (on && e.speed > 220) fx.dust(e.x, e.y, 2 + Math.round(e.speed / 200), e.nx * 0.5, e.ny * 0.5);
+          if (on && e.speed > (royale ? 420 : 220)) fx.dust(e.x, e.y, 2 + Math.round(e.speed / 200), e.nx * 0.5, e.ny * 0.5);
           break;
         }
         case 'bump': {
@@ -1504,7 +1507,7 @@ export class Game {
           view(e.b).squash(5, -4);
           this.sfx.bump(e.force);
           j.addTrauma(Math.min(0.12, e.force / 6000));
-          if (on) fx.dust(e.x, e.y, 3, 0, 0);
+          if (on && !royale) fx.dust(e.x, e.y, 3, 0, 0);
           break;
         }
         case 'hit': {
@@ -1516,21 +1519,20 @@ export class Game {
           if (!this.firstBlood && !this.replaying) {
             this.firstBlood = true;
             this.sfx.firstBlood();
-            fx.text(e.x, y - 130, 'FIRST BLOOD!', { color: 0xff5a46, size: on ? 44 : 28, toss: false, dur: 1.3 });
+            if (!royale) fx.text(e.x, y - 130, 'FIRST BLOOD!', { color: 0xff5a46, size: on ? 44 : 28, toss: false, dur: 1.3 });
           }
           view(e.b).hitFlash();
           view(e.b).squash(heavy ? 10 : 6, heavy ? -9 : -6);
           j.addHitstop(heavy ? 0.09 : e.crit ? 0.11 : 0.05);
-          j.addTrauma(heavy ? 0.3 : e.crit ? 0.35 : 0.15);
-          if (e.crit || heavy) j.addPunch(heavy ? 0.04 : 0.03);
+          j.addTrauma(heavy ? 0.23 : e.crit ? 0.25 : e.skill ? 0.10 : 0.04);
+          if (!royale && (e.crit || heavy)) j.addPunch(heavy ? 0.04 : 0.03);
           if (on) {
-            fx.sparks(e.x, y, e.dx, e.dy, heavy ? 22 : e.crit ? 16 : 9, e.crit ? 0xffe066 : 0xfff1c8);
+            fx.sparks(e.x, y, e.dx, e.dy, heavy ? 12 : e.crit ? 9 : e.skill ? 4 : 2, e.crit ? 0xffe066 : 0xfff1c8);
             if (heavy || e.crit) fx.ring(e.x, y, e.crit ? 0xffe066 : 0xffffff, heavy ? 140 : 90, 0.3, heavy ? 10 : 6);
             if (heavy) fx.dust(b.x, b.y, 8, e.dx, e.dy);
           }
-          if (e.crit) fx.text(e.x, y - 50, `${e.dmg}!`, { color: 0xffd23f, size: on ? 64 : 34 });
-          else fx.text(e.x, y - 40, String(e.dmg), { color: e.skill ? 0xffe6a8 : 0xffffff, size: on ? (heavy ? 58 : 42) : 30, toss: on });
-          if (heavy && on) this.hud.flash(0.18, 90);
+          showDamage(e.b, e.dmg, e.crit);
+          if (heavy && on && !royale) this.hud.flash(0.18, 90);
           break;
         }
         case 'blocked': {
@@ -1541,7 +1543,7 @@ export class Game {
           j.addHitstop(0.04);
           j.addTrauma(0.08);
           if (on) fx.sparks(e.x, y, F[e.a].x - F[e.b].x, 0, 7, 0x8fd3ff, 500);
-          fx.text(e.x, y - 40, `BLOCK ${e.dmg}`, { color: 0xc9d4de, size: on ? 30 : 24, toss: false });
+          showDamage(e.b, e.dmg);
           break;
         }
         case 'parry': {
@@ -1585,7 +1587,7 @@ export class Game {
           view(e.b).dodged();
           this.sfx.dash();
           if (on) fx.dust(b.x, b.y, 4, -e.dx, -e.dy);
-          fx.text(b.x, b.y - 140 * sc(e.b), 'DODGE', { color: 0xbfe8ff, size: on ? 32 : 22, toss: false });
+          if (!royale) fx.text(b.x, b.y - 140 * sc(e.b), 'DODGE', { color: 0xbfe8ff, size: on ? 32 : 22, toss: false });
           break;
         }
         case 'chargeStart': {
@@ -1610,7 +1612,7 @@ export class Game {
             fx.shards(e.x, e.y - 40, 0x8a7560, 8);
             fx.propPop('dust', e.x, e.y - 30, 110, 0.5, { rise: 20 });
           }
-          fx.text(e.x, e.y - 120, `WALL! ${e.dmg}`, { color: 0xffb02e, size: on ? 44 : 26, toss: false });
+          showDamage(e.b, e.dmg);
           break;
         }
         case 'status': {
@@ -1628,13 +1630,14 @@ export class Game {
           const [label, col] = LABEL[e.kind] ?? [e.kind.toUpperCase(), 0xffffff];
           if (e.kind === 'stun') this.sfx.stun();
           else this.sfx.status(e.kind);
-          fx.text(b.x + 40, b.y - 175 * sc(e.b), label, { color: col, size: on ? 28 : 20, toss: false, dur: 0.9 });
+          if (!royale || ['stun', 'sleep', 'silence', 'disarm', 'root', 'charm'].includes(e.kind)) {
+            fx.text(b.x + 40, b.y - 175 * sc(e.b), label, { color: col, size: royale ? 18 : on ? 28 : 20, toss: false, dur: royale ? 0.55 : 0.9 });
+          }
           break;
         }
         case 'dot': {
-          const b = F[e.b];
           this.sfx.dot(e.kind);
-          fx.text(b.x - 30, b.y - 120 * sc(e.b), String(e.dmg), { color: e.kind === 'poison' ? 0xb36bff : 0xff8a3a, size: on ? 26 : 20, toss: on, dur: 0.6 });
+          showDamage(e.b, e.dmg);
           break;
         }
         case 'heal': {
@@ -1653,13 +1656,13 @@ export class Game {
         }
         case 'note': {
           const b = F[e.b];
-          fx.text(b.x - 40, b.y - 185 * sc(e.b), e.text, { color: e.color, size: on ? 30 : 22, toss: false, dur: 0.8 });
+          if (!royale) fx.text(b.x - 40, b.y - 185 * sc(e.b), e.text, { color: e.color, size: on ? 30 : 22, toss: false, dur: 0.8 });
           break;
         }
         case 'shieldHit': {
           const b = F[e.b];
           this.sfx.absorb();
-          fx.text(b.x + 30, b.y - 150 * sc(e.b), `ABSORB ${e.absorbed}`, { color: 0x9fd8ff, size: on ? 26 : 20, toss: false, dur: 0.7 });
+          if (!royale) fx.text(b.x + 30, b.y - 150 * sc(e.b), `ABSORB ${e.absorbed}`, { color: 0x9fd8ff, size: on ? 26 : 20, toss: false, dur: 0.7 });
           break;
         }
         case 'specialReady': {
@@ -1674,7 +1677,7 @@ export class Game {
             const casts = (this.specialCasts[e.a] = (this.specialCasts[e.a] ?? 0) + 1);
             const mode = this.replaying ? 'off' : this.cutMode === 'full' && casts > 1 ? 'short' : this.cutMode;
             this.sfx.special(a.def.id);
-            if (mode !== 'off') {
+            if (mode !== 'off' && !royale) {
               this.cutscene.play(a.def, a.team, mode);
               if (!this.roomLink) {
                 this.cutT = CUTSCENE_DUR[mode];
@@ -1687,6 +1690,7 @@ export class Game {
           if (!special) this.sfx.skill(a.def.id);
           this.hud.skillFired(e.a, e.kind);
           this.castCues(e.a, e.name, special, castColor(a.def));
+          if (royale && special) this.hud.announce(`${a.def.displayName}: ${e.name}`, '#ffd23f', 1);
           break;
         }
         case 'hazard': {
@@ -1701,6 +1705,7 @@ export class Game {
         case 'ko': {
           const b = F[e.b];
           this.sfx.ko();
+          if (royale) this.hud.announce(`${b.def.displayName} eliminated`, '#ff856e', 2);
           if (!this.sim.over) {
             this.sfx.down();
             // a tag-team partner falls but the fight goes on: big hit, no slow-mo or zoom
@@ -1710,7 +1715,7 @@ export class Game {
               fx.ring(b.x, b.y, 0xffffff, 200, 0.5, 10);
               fx.shards(b.x, b.y - 60, b.def.color, 12);
             }
-            fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.displayName.toUpperCase()} DOWN!`, { color: 0xff5a46, size: on ? 46 : 28, toss: false, dur: 1.4 });
+            fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.displayName.toUpperCase()} DOWN!`, { color: 0xff5a46, size: royale ? 24 : on ? 46 : 28, toss: false, dur: royale ? 0.8 : 1.4 });
             break;
           }
           j.addHitstop(0.18);
@@ -1722,7 +1727,7 @@ export class Game {
             fx.ring(b.x, b.y, 0xffffff, 260, 0.6, 14);
             fx.shards(b.x, b.y - 60, b.def.color, 18);
           }
-          this.hud.callout('K.O.!');
+          if (!royale) this.hud.callout('K.O.!');
           if (!this.replaying) this.ko = { tick: this.sim.tick, victim: e.b, killer: this.lastHitBy[e.b] ?? -1 };
           break;
         }
@@ -1731,6 +1736,7 @@ export class Game {
           const c = CARD_BY_ID.get(e.id);
           if (!c || this.replaying) break;
           for (const f of F) if (f.team === e.team && f.state !== 'ko') {
+            if (royale) continue; // The draft and Cards panel already show the choice.
             const hd = view(f.idx).point('head');
             fx.text(hd.x, hd.y - 60, `${c.glyph} ${c.name}`, { color: c.rarity === 'epic' ? 0xc89bff : c.rarity === 'rare' ? 0x8fb8ff : 0xb8e0a8, size: on ? 30 : 22, toss: false, dur: 1.4 });
             if (on) fx.ring(f.x, f.y, c.rarity === 'epic' ? 0xa35cff : c.rarity === 'rare' ? 0x4c8dff : 0x8fbf7a, 110, 0.5, 6);
@@ -1755,11 +1761,11 @@ export class Game {
             'chain-reaction': ['fx-chain', 170, 0.5], 'lightning-rod': ['fx-rod', 190, 0.5], aegis: ['fx-shield', 150, 0.8],
           };
           const sp = sprite[e.card];
-          if (sp && on) {
+          if (sp && on && (!royale || big)) {
             const at = e.b !== undefined && (e.card === 'chain-reaction' || e.card === 'lightning-rod') ? F[e.b] : a;
             fx.propPop(sp[0], at.x, at.y - 70 * sc(at.idx), sp[1], sp[2], { rise: sp[0] === 'fx-parachute' ? -60 : 30, additive: sp[0] !== 'fx-parachute' });
           }
-          fx.text(a.x, a.y - 210 * sc(e.a), `${c.glyph} ${c.name.toUpperCase()}!`, { color: 0xffd23f, size: on ? (big ? 44 : 30) : 22, toss: false, dur: big ? 1.4 : 0.9 });
+          if (!royale || big) fx.text(a.x, a.y - 210 * sc(e.a), `${c.glyph} ${c.name.toUpperCase()}!`, { color: 0xffd23f, size: on ? (big ? 44 : 30) : 22, toss: false, dur: big ? 1.4 : 0.9 });
           if (big) {
             j.addHitstop(0.12);
             j.addTrauma(0.35);
@@ -1814,16 +1820,17 @@ export class Game {
     if (!v) return;
     const a = F[i];
     const tint = special ? 0xffd23f : col;
-    fx.castPlate(() => v.point('head'), name, special ? tint : TEAM_COLORS[a.team], special, a.def.displayName.toUpperCase(), this.juice.enabled);
+    const royale = !!this.sim.opts.royale;
+    fx.castPlate(() => v.point('head'), name, special ? tint : TEAM_COLORS[a.team], special, a.def.displayName.toUpperCase(), this.juice.enabled, i, royale);
     if (!this.juice.enabled) return;
     const c = v.point('chest');
-    fx.castBurst(c.x, c.y, tint, special);
-    fx.ring(a.x, a.y, tint, special ? 176 : 130, special ? 0.65 : 0.45, special ? 11 : 8);
+    if (special) fx.castBurst(c.x, c.y, tint, true);
+    fx.ring(a.x, a.y, tint, special ? 176 : 76, special ? 0.65 : 0.3, special ? 11 : 4);
     const t = F[a.targetIdx];
     const tv = t && this.scene.views[t.idx];
     if (t && tv && t.state !== 'ko' && t.team !== a.team) {
-      fx.telegraph(() => v.point('feet'), () => tv.point('feet'), tint, special ? 0.75 : 0.55);
-      fx.reticle(() => tv.point('feet'), tint, special ? 1.1 : 0.85);
+      if (special) fx.telegraph(() => v.point('feet'), () => tv.point('feet'), tint, 0.65);
+      fx.reticle(() => tv.point('feet'), tint, special ? 0.95 : 0.4);
     }
   }
 
