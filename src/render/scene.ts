@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
-import { arenaArt, propTex } from './art';
+import { arenaArt, propTex, type ArenaArt } from './art';
+import { DEFAULT_ARENA, type ArenaId } from '../data/arenas';
 import { DEPTH } from './depth';
 import { ARENA_H, ARENA_W } from '../sim/constants';
 import type { Sim } from '../sim/sim';
@@ -31,6 +32,8 @@ export class Scene {
   app!: Application;
   world = new Container();
   private floor = new Container();
+  private arena?: ArenaArt;
+
   private entities = new Container();
   private overFx = new Container();
   private groundLayer!: Container;
@@ -66,6 +69,19 @@ export class Scene {
     this.world.addChild(this.floor, groundFx, this.entities, this.overFx);
     this.app.stage.addChild(this.world);
     this.fx = new Fx(this.app.renderer, groundFx, this.overFx);
+    this.arena = arenaArt();
+    this.drawArena();
+    this.snapCamera();
+  }
+
+  get arenaId() {
+    return this.arena?.name ?? DEFAULT_ARENA;
+  }
+
+  setArena(id: ArenaId) {
+    const art = arenaArt(id) ?? arenaArt();
+    if (art === this.arena) return;
+    this.arena = art;
     this.drawArena();
     this.snapCamera();
   }
@@ -82,7 +98,7 @@ export class Scene {
   /** Zoom + centre that fit the whole box into the layout's arena rect. */
   private fit() {
     const L = layoutDims(this.layout, this.portraitH);
-    const art = arenaArt();
+    const art = this.arena;
     let worldW = ARENA_W + 90;
     let worldH = ARENA_H + WALL_H + 70;
     let cx = ARENA_W / 2;
@@ -107,9 +123,9 @@ export class Scene {
   }
 
   /** Painted arena from the art pipeline when there is one, else the drawn placeholder. */
-  drawArena() {
+  private drawArena() {
     for (const c of this.floor.removeChildren()) c.destroy();
-    const art = arenaArt();
+    const art = this.arena;
     // painted floor is wider than deep (3/4 view): squash the world instead of stretching the art
     DEPTH.k = art ? Math.max(0.55, Math.min(1, art.floor.h / art.floor.w)) : 1;
     if (art) {

@@ -139,7 +139,7 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
-  if ((e.target as HTMLElement).closest('input, textarea')) return;
+  if ((e.target as HTMLElement).closest('input, textarea, select')) return;
   const map: Record<string, string> = { KeyR: 'new', KeyT: 'replay', Space: 'pause', KeyS: 'speed', KeyJ: 'juice', KeyM: 'sound', KeyL: 'layout', KeyC: 'cutscene', KeyF: 'select', KeyK: 'share', KeyB: 'buffs', Escape: 'menu' };
   if (e.code === 'Escape' && game.draft.open) return;
   if (e.code === 'Escape' && game.started && !game.sim.over) {

@@ -21,7 +21,12 @@ function rigSaver(): Plugin {
         for await (const chunk of req) body += chunk;
         try {
           const rig = JSON.parse(body);
-          writeFileSync('art/rig.json', JSON.stringify(rig, null, 2) + '\n');
+          const rigPath = 'art/rig.json';
+          if (existsSync(rigPath)) {
+            const saved = JSON.parse(readFileSync(rigPath, 'utf8'));
+            if (saved.arenas) rig.arenas = { ...saved.arenas, ...rig.arenas };
+          }
+          writeFileSync(rigPath, JSON.stringify(rig, null, 2) + '\n');
           const mPath = 'public/art/manifest.json';
           if (existsSync(mPath)) {
             const m = JSON.parse(readFileSync(mPath, 'utf8'));

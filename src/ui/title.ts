@@ -39,7 +39,7 @@ export class TitleScreen {
       <div class="t-logo">
         <div class="t-word">${letters('JOB', 'l1', 0)}</div>
         <div class="t-word wars">${letters('WARS', 'l2', 3)}</div>
-        <div class="t-tag">30 real jobs. One arena. No overtime pay.</div>
+        <div class="t-tag">30 real jobs. Seven arenas. No overtime pay.</div>
       </div>
       <button class="t-start">Tap to start</button>
       <div class="t-foot"><span>PvP · Gacha · Story · Tag Team</span><span>Sound effects: Oculus Audio Pack 01 (CC BY 4.0)</span></div>`;

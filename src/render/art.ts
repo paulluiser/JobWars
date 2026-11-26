@@ -1,4 +1,5 @@
 import { Assets, type Texture } from 'pixi.js';
+import { DEFAULT_ARENA } from '../data/arenas';
 
 /**
  * Real art (from the pipeline in tools/art) with graceful fallback: anything missing
@@ -41,7 +42,7 @@ interface Manifest {
 
 const BASE = `${import.meta.env.BASE_URL}art/`;
 const chars = new Map<string, CharArt>();
-let arena: ArenaArt | null = null;
+const arenas = new Map<string, ArenaArt>();
 const props = new Map<string, Texture>();
 const cardUrls = new Map<string, string>();
 const uiUrls = new Map<string, string>();
@@ -65,7 +66,7 @@ const preload = (url: string) => track(new Promise<void>((res) => { const i = ne
 
 export async function loadArt(): Promise<void> {
   chars.clear();
-  arena = null;
+  arenas.clear();
   props.clear();
   cardUrls.clear();
   let m: Manifest;
@@ -112,14 +113,14 @@ export async function loadArt(): Promise<void> {
       } catch {}
     }),
   );
-  const [name, a] = Object.entries(m.arenas ?? {})[0] ?? [];
-  if (name && a) {
+  await Promise.all(Object.entries(m.arenas ?? {}).map(async ([name, a]) => {
     try {
-      arena = { name, texture: await track(Assets.load<Texture>(BASE + a.src + v)), floor: a.floor };
+      const texture = await track(Assets.load<Texture>(BASE + a.src + v));
+      arenas.set(name, { name, texture, floor: a.floor });
     } catch (e) {
-      console.warn("art: couldn't load the arena, using the drawn one", e);
+      console.warn(`art: couldn't load arena ${name}`, e);
     }
-  }
+  }));
 }
 
 /**
@@ -175,7 +176,8 @@ export const uiArtUrl = (id: string) => uiUrls.get(id);
 /** the key-art poster for a layout (falls back to the other shape) */
 export const posterUrl = (portrait: boolean) => (portrait ? posters.portrait ?? posters.landscape : posters.landscape ?? posters.portrait);
 export const hasSprites = (id: string) => !!(chars.get(id)?.body && chars.get(id)?.weapon);
-export const arenaArt = () => arena;
+export const arenaArt = (id: string = DEFAULT_ARENA) => arenas.get(id);
+export const arenaIds = () => [...arenas.keys()].sort();
 /** a painted prop from the props sheet (wall, truck, fire, …), if the pipeline produced one */
 export const propTex = (name: string | undefined) => (name ? props.get(name) : undefined);
 
@@ -184,6 +186,7 @@ export function setRig(id: string, rig: Rig) {
   const a = chars.get(id);
   if (a) a.rig = rig;
 }
-export function setFloor(floor: Floor) {
+export function setFloor(id: string, floor: Floor) {
+  const arena = arenas.get(id);
   if (arena) arena.floor = floor;
 }

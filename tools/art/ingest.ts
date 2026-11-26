@@ -8,10 +8,12 @@
 import sharp from 'sharp';
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { ARENA_NAMES, DEFAULT_ARENA } from '../../src/data/arenas';
 import { bbox, borderTransparency, load, removeBackground, type Img, type Rig } from './process';
 import { jobIdFor } from './jobs';
 
 const IMAGE = /\.(png|jpe?g|webp)$/i;
+const arenaSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const PARTS = ['master', 'body', 'weapon', 'bust', 'icon', 'sheet'] as const;
 type Part = (typeof PARTS)[number];
 
@@ -263,10 +265,25 @@ export async function ingest(inbox: string, raw: string): Promise<IngestReport> 
     }
     if (/arena|stage|map|court/i.test(d.name)) {
       mkdirSync(join(raw, 'arena'), { recursive: true });
-      const f = files[0];
-      await sharp(join(dir, f)).png().toFile(join(raw, 'arena', 'market.png'));
-      rep.lines.push(`${d.name}/${f} → arena`);
-      if (files.length > 1) rep.warnings.push(`${d.name}: several images, used "${f}" as the arena`);
+      const folderId = arenaSlug(/^arena\s*-\s*(.+)$/i.exec(d.name)?.[1] ?? '');
+      const named = new Map<string, string>();
+      if (!folderId) {
+        for (const file of files) {
+          const stem = `-${arenaSlug(file.replace(IMAGE, ''))}-`;
+          const id = Object.keys(ARENA_NAMES).find((id) => stem.includes(`-${id}-`));
+          if (!id) continue;
+          if (named.has(id)) rep.warnings.push(`${d.name}/${file}: another image already matched arena ${id}`);
+          else named.set(id, file);
+        }
+      }
+      if (!named.size) {
+        named.set(folderId || DEFAULT_ARENA, files[0]);
+        if (files.length > 1) rep.warnings.push(`${d.name}: several images, used "${files[0]}" as the arena`);
+      }
+      for (const [id, file] of named) {
+        await sharp(join(dir, file)).png().toFile(join(raw, 'arena', `${id}.png`));
+        rep.lines.push(`${d.name}/${file} → arena/${id}.png`);
+      }
       continue;
     }
     const id = jobIdFor(d.name);

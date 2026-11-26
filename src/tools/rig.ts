@@ -1,7 +1,7 @@
 // Dev-only rig tuner (/rig.html). Not part of the production build.
 import { Application, Container, Graphics } from 'pixi.js';
 import { ROSTER } from '../data/roster';
-import { arenaArt, charArt, hasSprites, loadArt, setFloor, setRig, type Floor, type Rig } from '../render/art';
+import { arenaArt, arenaIds, charArt, hasSprites, loadArt, setFloor, setRig, type Floor, type Rig } from '../render/art';
 import { FighterView, VIS } from '../render/fighterView';
 import { Fx } from '../render/fx';
 import { Juice } from '../render/juice';
@@ -26,6 +26,9 @@ world.position.set(400, 560);
 world.scale.set(2.2);
 const fx = new Fx(app.renderer, under, over);
 const juice = new Juice();
+
+const arenaNames = arenaIds();
+let currentArena = arenaArt()?.name ?? arenaNames[0];
 
 const ids = ROSTER.filter((d) => hasSprites(d.id)).map((d) => d.id);
 let current = ids[0];
@@ -90,13 +93,12 @@ const FLOOR: { key: keyof Floor; label: string }[] = [
 function rigJson() {
   const out: Record<string, unknown> = {};
   for (const id of ids) out[id] = charArt(id)!.rig;
-  const a = arenaArt();
-  if (a) out.arenas = { [a.name]: { floor: a.floor } };
+  if (arenaNames.length) out.arenas = Object.fromEntries(arenaNames.map((id) => [id, { floor: arenaArt(id)!.floor }]));
   return out;
 }
 
 function drawArenaPreview(canvas: HTMLCanvasElement) {
-  const a = arenaArt();
+  const a = arenaArt(currentArena);
   if (!a) return;
   const ctx = canvas.getContext('2d')!;
   const src = a.texture.source.resource as CanvasImageSource;
@@ -111,7 +113,8 @@ function drawArenaPreview(canvas: HTMLCanvasElement) {
 }
 
 function render() {
-  if (!ids.length && !arenaArt()) {
+  const arena = arenaArt(currentArena);
+  if (!ids.length && !arena) {
     panel.innerHTML = `<div class="empty"><h2>No art yet</h2>Put ChatGPT images in <code>art/raw/&lt;id&gt;/</code> (see <code>art/PROMPTS.md</code>), run <code>npm run art</code>, then reload this page.</div>`;
     return;
   }
@@ -120,12 +123,22 @@ function render() {
     ${ids.length ? `<h2>Character</h2>
     <select id="who">${ids.map((id) => `<option value="${id}" ${id === current ? 'selected' : ''}>${ROSTER.find((d) => d.id === id)!.name}</option>`).join('')}</select>
     ${SLIDERS.map((s) => `<label>${s.label}<input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.get(rig!)}" data-k="${s.key}"><output>${s.get(rig!)}</output></label>`).join('')}` : '<p class="empty">No character has both body.png and weapon.png yet.</p>'}
-    ${arenaArt() ? `<h2>Arena floor</h2><div id="arenaBox"><canvas id="arenaCv" width="320" height="320"></canvas></div>
-    ${FLOOR.map((s) => `<label>${s.label}<input type="range" min="0" max="1" step="0.005" value="${arenaArt()!.floor[s.key]}" data-f="${s.key}"><output>${arenaArt()!.floor[s.key]}</output></label>`).join('')}` : ''}
+    ${arena ? `<h2>Arena floor</h2>
+    <select id="arena" aria-label="Arena"></select>
+    <div id="arenaBox"><canvas id="arenaCv" width="320" height="320"></canvas></div>
+    ${FLOOR.map((s) => `<label>${s.label}<input type="range" min="0" max="1" step="0.005" value="${arena.floor[s.key]}" data-f="${s.key}"><output>${arena.floor[s.key]}</output></label>`).join('')}` : ''}
     <div class="row"><button class="primary" id="save">Save</button><button id="copy">Copy rig JSON</button></div>
     <div id="status"></div>`;
   const cv = document.getElementById('arenaCv') as HTMLCanvasElement | null;
   if (cv) drawArenaPreview(cv);
+  const arenaSelect = document.querySelector<HTMLSelectElement>('#arena');
+  if (arenaSelect) {
+    arenaSelect.replaceChildren(...arenaNames.map((id) => new Option(id, id, false, id === currentArena)));
+    arenaSelect.addEventListener('change', () => {
+      currentArena = arenaSelect.value;
+      render();
+    });
+  }
   document.getElementById('who')?.addEventListener('change', (e) => {
     current = (e.target as HTMLSelectElement).value;
     rebuild();
@@ -143,8 +156,8 @@ function render() {
   );
   panel.querySelectorAll<HTMLInputElement>('input[data-f]').forEach((inp) =>
     inp.addEventListener('input', () => {
-      const f = { ...arenaArt()!.floor, [inp.dataset.f!]: Number(inp.value) };
-      setFloor(f);
+      const f = { ...arenaArt(currentArena)!.floor, [inp.dataset.f!]: Number(inp.value) };
+      setFloor(currentArena, f);
       (inp.nextElementSibling as HTMLOutputElement).value = inp.value;
       if (cv) drawArenaPreview(cv);
     }),

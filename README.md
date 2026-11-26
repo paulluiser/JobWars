@@ -4,8 +4,8 @@
 
 Browser auto-battler where real-world jobs fight as chibi RPG heroes. Design: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
 
-Current state: **M4 + full art**: all 30 jobs playable with real art (sprites, cutscene portraits, icons), a painted
-arena and a painted props sheet (summons, thrown objects, special-move props, items, effects). Auto-balanced to
+Current state: **M4 + full art**: all 30 jobs playable with real art (sprites, cutscene portraits, icons), seven painted
+arenas and a painted props sheet (summons, thrown objects, special-move props, items, effects). Auto-balanced to
 43–56% overall win rates. Character select with role filter, attribute bars and Simple/Detailed skill text.
 
 ## Run
@@ -26,16 +26,17 @@ npm run tune       # auto-balance ATK/HP multipliers toward 50% (writes src/data
 ```
 
 Keys: `F` fighters · `R` rematch · `T` replay seed · `Space` pause · `S` speed · `J` juice on/off · `M` sound · `C` cutscenes (full/short/off) · `L` layout (auto / 9:16 / 16:9) · `Enter` fight (on the select screen).
-Link a specific fight: `?blue=chef&red=fisher&seed=1234`.
+Link a specific fight with `?blue=chef&red=fisher&seed=1234&arena=theatre`.
 Add `?layout=portrait` to the URL to force the vertical layout, e.g. for recording Reels/TikTok on desktop.
 
 ## Art pipeline (M3)
 
 1. Generate images in ChatGPT with the prompts in [art/PROMPTS.md](art/PROMPTS.md) (rules: [docs/ART_STYLE.md](docs/ART_STYLE.md)).
 2. Put each job's images (any file names, sprite sheets OK) in a folder named after the job inside `art/inbox/`
-   (or anywhere, then `npm run art -- --inbox "/that/folder"`). Props sheet: a folder called `Props`.
+   (or anywhere, then `npm run art -- --inbox "/that/folder"`). Put the props sheet in `Props` and each
+   arena painting in `Arena - <id>` or name it by ID inside `Arena` (see [arena prompts](art/PROMPTS_ARENAS.md)).
 3. `npm run art` cleans them into `public/art/` (background removal, trim, resize, manifest).
-4. `npm run dev`, open `/rig.html`, align each arm with its shoulder (and the arena floor), **Save**.
+4. `npm run dev`, open `/rig.html`, align each arm with its shoulder or select an arena and align its floor, then **Save**.
 5. Reload the game. Characters with art use it; the rest keep the placeholders.
 
 ## Deploy (Vercel)
@@ -84,7 +85,8 @@ The game opens on a main menu with three modes:
   with a twist: classic rules, time attack, survival 1-vs-2, bosses with big HP and epic cards, power surges
   (a pick every 10 s), sudden death, lab accidents, tag teams and a finale. 1–3 stars per level.
 - **CPU Battle**: everything unlocked. 1v1, Tag Team (with a **Gacha** toggle: you draft for Blue, the CPU
-  drafts for Red at random) and Tournaments.
+  drafts for Red at random) and Tournaments. The arena picker offers every arena and Auto, which uses
+  the home arena of a fighter chosen by the match seed. Tournaments use the Job Fair Arena.
 
 ### Gacha (Chaos-style card draft)
 

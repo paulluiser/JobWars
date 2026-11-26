@@ -1,4 +1,5 @@
 import { ROSTER } from '../data/roster';
+import { ARENA_NAMES, isArenaId, type ArenaChoice } from '../data/arenas';
 import type { Sim } from '../sim/sim';
 import type { Fighter, FighterDef, Role } from '../sim/types';
 import { face } from './face';
@@ -63,10 +64,11 @@ export interface SelectState {
   tFormat: Format;
   /** CPU Battle 1v1 / Tag Team: play it as a Gacha match (you draft for Blue, the CPU for Red) */
   gacha: boolean;
+  arena: ArenaChoice;
 }
 
 export type SelectResult =
-  | { mode: 'duel' | 'tag'; picks: FighterDef[]; gacha: boolean }
+  | { mode: 'duel' | 'tag'; picks: FighterDef[]; gacha: boolean; arena: ArenaChoice }
   | { mode: 'tourney'; entrants: FighterDef[]; format: Format };
 
 const ROLES: (Role | 'All')[] = ['All', 'Tank', 'Fighter', 'Assassin', 'Mage', 'Marksman', 'Support', 'Controller'];
@@ -170,6 +172,12 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
       : `<button data-sel="rand">Random ${tag ? 'teams' : 'both'}</button>
          <button data-sel="swap">Swap sides</button>
          <button data-sel="gacha" class="gacha-toggle ${st.gacha ? 'on' : ''}" aria-pressed="${st.gacha}" title="You draft cards for Blue every 20 s; the CPU drafts for Red">Gacha ${st.gacha ? 'ON' : 'OFF'}</button>
+         <label class="arena-pick">Arena
+           <select data-arena>
+             <option value="auto">Auto</option>
+             ${Object.entries(ARENA_NAMES).map(([id, name]) => `<option value="${id}" ${st.arena === id ? 'selected' : ''}>${esc(name)}</option>`).join('')}
+           </select>
+         </label>
          <span class="hint">${hint}</span>
          <button class="primary big" data-sel="go">Fight!</button>`;
     panel.innerHTML = `
@@ -200,6 +208,10 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
         <div class="sel-foot">${foot}</div>
         <div class="credits">Sound effects: <a href="https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/" target="_blank" rel="noopener">“Oculus Audio Pack 01”</a> by Oculus VR, LLC, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (cut and levelled for this game).</div>
       </div>`;
+    panel.querySelector<HTMLSelectElement>('[data-arena]')?.addEventListener('change', ({ currentTarget }) => {
+      const { value } = currentTarget as HTMLSelectElement;
+      if (value === 'auto' || isArenaId(value)) st.arena = value;
+    });
     hintFlash = '';
   };
 
@@ -267,7 +279,7 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
         case 'go':
           panel.onclick = null;
           if (st.mode === 'tourney') onGo({ mode: 'tourney', entrants: randomJobs(jobsNeeded(st), st.entrants), format: st.tFormat });
-          else onGo({ mode: st.mode, picks: st.picks.slice(), gacha: st.gacha });
+          else onGo({ mode: st.mode, picks: st.picks.slice(), gacha: st.gacha, arena: st.arena });
           return;
       }
     draw();

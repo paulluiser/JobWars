@@ -49,6 +49,25 @@ describe('art pipeline', () => {
     expect(report.files.find((f) => f.out.endsWith('weapon.webp'))!.bgRemoved).toBeGreaterThan(0.3);
   }, 30000);
 
+  it('imports named arenas without replacing the original arena', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'jobwars-arenas-'));
+    const inbox = join(root, 'inbox');
+    const raw = join(root, 'raw');
+    const sources = [
+      ['Court', 'painting.png'],
+      ['Arena - City Hall', 'painting.png'],
+      ['Arena', 'Job Wars Hospital Arena v2.png'],
+      ['Arena', 'Theatre.png'],
+    ];
+    for (const [name, filename] of sources) {
+      const folder = join(inbox, name);
+      mkdirSync(folder, { recursive: true });
+      await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ba8561' } }).png().toFile(join(folder, filename));
+    }
+    await ingest(inbox, raw);
+    for (const id of ['market', 'city-hall', 'hospital', 'theatre']) expect(existsSync(join(raw, 'arena', `${id}.png`)), id).toBe(true);
+  });
+
   it('matches loose folder names to jobs', () => {
     expect(jobIdFor('Fisherman')).toBe('fisher');
     expect(jobIdFor('fire fighter')).toBe('firefighter');

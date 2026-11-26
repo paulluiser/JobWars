@@ -246,6 +246,8 @@ body.portrait .cs-band { top: 18%; height: 62%; }
 .skill .quote { font-family: var(--display); font-size: calc(var(--u) * 1.05); color: #b34100; margin-top: calc(var(--u) * 0.3); }
 .sel-foot { display: flex; align-items: center; gap: calc(var(--u) * 0.8); }
 .sel-foot .hint { flex: 1; text-align: center; font-family: var(--type); font-size: calc(var(--u) * 1); color: var(--paper); }
+.arena-pick { display: inline-flex; align-items: center; gap: calc(var(--u) * 0.35); color: var(--paper); font-family: var(--type); font-size: calc(var(--u) * 1); }
+.arena-pick select { max-width: 100%; padding: calc(var(--u) * 0.35); border: 2px solid var(--ink); border-radius: 5px; background: var(--paper); color: var(--ink); font: inherit; }
 button.big { font-size: calc(var(--u) * 1.8); padding: calc(var(--u) * 0.6) calc(var(--u) * 2.6); }
 body.portrait .sel-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 body.portrait .slot { min-width: 0; flex: 1; }

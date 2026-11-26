@@ -113,20 +113,37 @@ export class PvpSession {
       const code = PvpSession.newCode();
       const peer = await openPeer(`${PREFIX}-lobby-${code}`).catch(() => null);
       if (!peer) continue;
-      const ready = waitIncoming(peer, signal).then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr));
+      const ready = waitIncoming(peer, signal)
+        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr))
+        .catch((error: unknown) => {
+          peer.destroy();
+          throw error;
+        });
       return { code, ready };
     }
     throw new Error("Couldn't reach the matchmaking service. Check your connection and try again.");
   }
 
   static async joinLobby(code: string, mode: PvpMode, mmr: number): Promise<PvpSession> {
-    const me = await openPeer();
-    const conn = await dial(me, `${PREFIX}-lobby-${code.trim().toUpperCase()}`, 8000).catch(() => null);
-    if (!conn) {
+    const normalized = code.trim().toUpperCase();
+    const me = await openPeer().catch(() => {
+      throw new Error("Couldn't reach matchmaking. Check your connection and try again.");
+    });
+    try {
+      const conn = await dial(me, `${PREFIX}-lobby-${normalized}`, 12000).catch((error: unknown) => {
+        if ((error as { type?: string })?.type === 'peer-unavailable') {
+          throw new Error(`Couldn't reach lobby ${normalized}. Ask your friend to keep the lobby open or create a fresh code.`);
+        }
+        if (error instanceof Error && error.message === 'timeout') {
+          throw new Error(`Connection timed out joining ${normalized}. Try a fresh lobby. If both players are on different networks, try the same Wi-Fi or another connection.`);
+        }
+        throw new Error(`Connection to lobby ${normalized} was interrupted. Try joining again.`);
+      });
+      return await new PvpSession([me], conn, false, mode).handshake(mmr);
+    } catch (error) {
       me.destroy();
-      throw new Error(`No lobby with code ${code.toUpperCase()}. Check the code (it's case-insensitive) and that your friend is still waiting.`);
+      throw error;
     }
-    return new PvpSession([me], conn, false, mode).handshake(mmr);
   }
 
   /**
@@ -182,43 +199,89 @@ export class PvpSession {
 function openPeer(id?: string): Promise<Peer> {
   return new Promise((res, rej) => {
     const p = id ? new Peer(id, { debug: 0 }) : new Peer({ debug: 0 });
-    const t = setTimeout(() => (p.destroy(), rej(new Error('timeout'))), 9000);
-    p.on('open', () => (clearTimeout(t), res(p)));
-    p.on('error', (e) => (clearTimeout(t), p.destroy(), rej(e)));
+    const clean = () => {
+      clearTimeout(t);
+      p.off('open', opened);
+      p.off('error', fail);
+    };
+    const opened = () => {
+      clean();
+      res(p);
+    };
+    const fail = (error: unknown) => {
+      clean();
+      p.destroy();
+      rej(error);
+    };
+    const t = setTimeout(() => fail(new Error('timeout')), 9000);
+    p.on('open', opened);
+    p.on('error', fail);
   });
 }
 
-/** connect to a peer id; rejects if nobody's there */
+/** Open the data channel, keeping signaling and channel failures distinct. */
 function dial(me: Peer, id: string, timeoutMs: number): Promise<DataConnection> {
   return new Promise((res, rej) => {
     const conn = me.connect(id, { reliable: true });
-    const fail = (e?: unknown) => {
+    if (!conn) return rej(new Error('disconnected'));
+    const clean = () => {
       clearTimeout(t);
       me.off('error', onErr);
-      try { conn.close(); } catch {}
-      rej(e ?? new Error('unavailable'));
+      me.off('disconnected', disconnected);
+      conn.off('open', opened);
+      conn.off('close', disconnected);
+      conn.off('error', fail);
     };
-    const onErr = (e: { type?: string }) => e?.type === 'peer-unavailable' && fail(e);
-    const t = setTimeout(() => fail(), timeoutMs);
-    me.on('error', onErr);
-    conn.on('open', () => {
-      clearTimeout(t);
-      me.off('error', onErr);
+    const fail = (error: unknown) => {
+      clean();
+      try { conn.close(); } catch {}
+      rej(error);
+    };
+    const disconnected = () => fail(new Error('disconnected'));
+    const onErr = (error: { type?: string }) => {
+      if (error?.type === 'peer-unavailable' || error?.type === 'network') fail(error);
+    };
+    const opened = () => {
+      clean();
       res(conn);
-    });
+    };
+    const t = setTimeout(() => fail(new Error('timeout')), timeoutMs);
+    me.on('error', onErr);
+    me.on('disconnected', disconnected);
+    conn.on('close', disconnected);
+    conn.on('error', fail);
+    conn.on('open', opened);
   });
 }
 
 function waitIncoming(peer: Peer, signal: AbortSignal, timeoutMs = 0): Promise<DataConnection> {
   return new Promise((res, rej) => {
-    let t = 0;
+    let t: ReturnType<typeof setTimeout> | undefined;
     const done = () => {
       clearTimeout(t);
       signal.removeEventListener('abort', abort);
+      peer.off('disconnected', disconnected);
+      peer.off('connection', incoming);
     };
-    const abort = () => (done(), peer.destroy(), rej(new Error('cancelled')));
+    const abort = () => {
+      done();
+      rej(new Error('cancelled'));
+    };
+    const disconnected = () => {
+      done();
+      rej(new Error('Your lobby disconnected from matchmaking. Create a new lobby and share the new code.'));
+    };
+    const incoming = (conn: DataConnection) => conn.once('open', () => {
+      done();
+      res(conn);
+    });
+    if (signal.aborted) return abort();
     signal.addEventListener('abort', abort);
-    if (timeoutMs) t = window.setTimeout(() => (done(), rej(new Error('timeout'))), timeoutMs);
-    peer.on('connection', (conn) => conn.on('open', () => (done(), res(conn))));
+    peer.on('disconnected', disconnected);
+    peer.on('connection', incoming);
+    if (timeoutMs) t = setTimeout(() => {
+      done();
+      rej(new Error('timeout'));
+    }, timeoutMs);
   });
 }

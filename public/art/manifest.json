@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "stamp": 1795660463021,
+  "stamp": 1795662000807,
   "characters": {
     "accountant": {
       "rig": {
@@ -574,6 +574,51 @@
     }
   },
   "arenas": {
+    "city-hall": {
+      "src": "arena/city-hall.webp",
+      "floor": {
+        "x": 0.165,
+        "y": 0.26,
+        "w": 0.67,
+        "h": 0.55
+      }
+    },
+    "construction": {
+      "src": "arena/construction.webp",
+      "floor": {
+        "x": 0.165,
+        "y": 0.25,
+        "w": 0.67,
+        "h": 0.555
+      }
+    },
+    "downtown": {
+      "src": "arena/downtown.webp",
+      "floor": {
+        "x": 0.165,
+        "y": 0.24,
+        "w": 0.67,
+        "h": 0.545
+      }
+    },
+    "farm-harbour": {
+      "src": "arena/farm-harbour.webp",
+      "floor": {
+        "x": 0.185,
+        "y": 0.27,
+        "w": 0.63,
+        "h": 0.56
+      }
+    },
+    "hospital": {
+      "src": "arena/hospital.webp",
+      "floor": {
+        "x": 0.17,
+        "y": 0.255,
+        "w": 0.66,
+        "h": 0.55
+      }
+    },
     "market": {
       "src": "arena/market.webp",
       "floor": {
@@ -581,6 +626,15 @@
         "y": 0.22,
         "w": 0.8,
         "h": 0.58
+      }
+    },
+    "theatre": {
+      "src": "arena/theatre.webp",
+      "floor": {
+        "x": 0.175,
+        "y": 0.26,
+        "w": 0.65,
+        "h": 0.535
       }
     }
   },

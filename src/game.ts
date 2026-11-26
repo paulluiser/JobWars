@@ -1,5 +1,6 @@
 import { Sfx } from './audio/sfx';
 import { ROSTER, byId } from './data/roster';
+import { DEFAULT_ARENA, isArenaId, resolveArena, storyArena, type ArenaChoice } from './data/arenas';
 import { ARENA_H, ARENA_W, DT } from './sim/constants';
 import { Sim, type SimOpts } from './sim/sim';
 import type { FighterDef, SimEvent, Team } from './sim/types';
@@ -35,6 +36,7 @@ export interface MatchSpec {
   kind: 'cpu' | 'pvp' | 'story' | 'tourney';
   gacha: boolean;
   control: [Side, Side];
+  arena?: ArenaChoice;
   names?: [string, string];
   /** extra sim options (Story: boss HP, time limits, enemy's starting cards) */
   extra?: Partial<SimOpts>;
@@ -127,6 +129,7 @@ export class Game {
     const qm = q.get('mode');
     if (qm === 'tag' || qm === 'duel' || qm === 'tourney') mode = qm;
     else if (blue.length > 1 || red.length > 1) mode = 'tag';
+    else if (q.has('seed') && blue.length === 1 && red.length === 1) mode = 'duel';
     const per = mode === 'tag' ? 2 : 1;
     const rb = randomJobs(per * 2, []);
     this.picks = [...[...blue, ...rb.slice(0, per)].slice(0, per), ...[...red, ...rb.slice(per)].slice(0, per)];
@@ -137,7 +140,7 @@ export class Game {
     } catch {}
     let cpuGacha = false;
     try { cpuGacha = localStorage.getItem('cpuGacha') === '1'; } catch {}
-    this.select = { mode: 'duel', picks: this.picks, slot: 0, focus: this.picks[0], detailed, entrants: [], tSize: 8, tFormat: 'duel', gacha: cpuGacha };
+    this.select = { mode: 'duel', picks: this.picks, slot: 0, focus: this.picks[0], detailed, entrants: [], tSize: 8, tFormat: 'duel', gacha: cpuGacha, arena: 'auto' };
     setMode(this.select, mode);
     this.mode = mode;
     this.picks = this.select.picks;
@@ -149,6 +152,8 @@ export class Game {
       this.presetLog = g.split(',').map((x) => x.split('.')).filter((x) => x.length === 3 && CARD_BY_ID.has(x[2])).map(([t, p, id]) => ({ team: Number(t) as Team, pick: Number(p), id }));
       this.spec = { kind: 'cpu', gacha: true, control: ['cpu', 'cpu'] };
     }
+    const arena = q.get('arena');
+    if (arena !== null && isArenaId(arena)) this.spec = { ...this.spec, arena };
     this.newFight(this.urlSeed ?? this.randomSeed());
     // a shared link (?seed=…&blue=…&red=…) opens straight into that exact fight
     if (this.urlSeed !== null && blue.length && red.length && mode !== 'tourney') {
@@ -171,6 +176,7 @@ export class Game {
     document.body.classList.toggle('tag', this.picks.length > 2);
     document.body.classList.toggle('gacha', this.spec.gacha);
     this.hideBuffs();
+    this.scene.setArena(resolveArena(this.spec.arena, this.picks.map((d) => d.id), seed));
     this.scene.setFighters(this.sim);
     this.hud.setup(this.sim, TEAM_HEX);
     this.acc = 0;
@@ -226,10 +232,11 @@ export class Game {
     const h = this.blueCount;
     const u = new URL(location.href);
     u.search = '';
-    if (this.picks.length > 2) u.searchParams.set('mode', 'tag');
+    u.searchParams.set('mode', this.picks.length > 2 ? 'tag' : 'duel');
     u.searchParams.set('blue', this.picks.slice(0, h).map((d) => d.id).join(','));
     u.searchParams.set('red', this.picks.slice(h).map((d) => d.id).join(','));
     u.searchParams.set('seed', String(this.seed));
+    if (this.scene.arenaId !== DEFAULT_ARENA) u.searchParams.set('arena', this.scene.arenaId);
     if (this.spec.gacha && this.draftLog.length) u.searchParams.set('g', this.draftLog.map((p) => `${p.team}.${p.pick}.${p.id}`).join(','));
     return u.toString();
   }
@@ -333,7 +340,9 @@ export class Game {
     }
     this.tourney = null;
     this.picks = r.picks;
-    this.spec = r.gacha ? { kind: 'cpu', gacha: true, control: ['human', 'cpu'], names: ['You', 'CPU'] } : CLASSIC;
+    this.spec = r.gacha
+      ? { kind: 'cpu', gacha: true, control: ['human', 'cpu'], names: ['You', 'CPU'], arena: r.arena }
+      : { ...CLASSIC, arena: r.arena };
     // a ?seed= link replays that exact fight once; after that every fight is fresh
     this.start(this.urlSeed ?? this.randomSeed());
     this.urlSeed = null;
@@ -547,6 +556,7 @@ export class Game {
     const closed = new Promise<void>((res) => { const old = sess.onClose; sess.onClose = () => { old?.(); res(); }; });
     this.spec = {
       kind: 'pvp',
+      arena: 'auto',
       gacha: PVP_MODES[sess.mode].gacha,
       control: me === 0 ? ['human', 'remote'] : ['remote', 'human'],
       names: me === 0 ? ['You', 'Rival'] : ['Rival', 'You'],
@@ -670,6 +680,7 @@ export class Game {
     let recruits: FighterDef[] = [];
     this.spec = {
       kind: 'story',
+      arena: storyArena(l),
       blue: mine.length,
       gacha: !l.classic,
       control: ['human', 'cpu'],
