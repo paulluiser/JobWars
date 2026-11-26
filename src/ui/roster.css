@@ -24,6 +24,7 @@
 .select .d-face { width: clamp(39px, 5vw, 64px); height: auto; aspect-ratio: 1; }
 .select .d-name { font-size: clamp(21px, 2.5vw, 35px); }
 .select .d-identity { display: flex; gap: 7px; align-items: center; margin-top: 2px; font-size: clamp(12px, 1.3vw, 17px); font-weight: 800; }
+.select .d-title { margin-top: 4px; font-size: clamp(11px, 1.05vw, 14px); line-height: 1.22; }
 .select .d-role { background: color-mix(in srgb, var(--rc) 30%, #fff7e7); color: var(--ink); font-size: clamp(10px, 1vw, 13px); padding: 1px 6px; }
 .select .profile-toolbar { display: flex; gap: 5px 9px; align-items: start; justify-content: space-between; flex-wrap: wrap; }
 .select .seg { margin: 0; }
@@ -31,7 +32,6 @@
 .select .skill-tabs { display: flex; gap: 4px; }
 .select .skill-tabs button { box-shadow: none; text-transform: capitalize; }
 .select .skill-tabs button[aria-pressed="true"] { background: #ffd23f; }
-.select .skill-list { display: grid; gap: 5px; }
 .select .skill { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 7px; margin: 0; padding: 5px 7px; border-style: solid; border-color: #b4a58b; }
 .skill-icon { display: block; object-fit: cover; border: 1px solid var(--ink); border-radius: 5px; vertical-align: middle; }
 .select .skill-icon { width: clamp(31px, 3.5vw, 51px); height: auto; aspect-ratio: 1; }
@@ -68,18 +68,15 @@ body:not(.portrait) .select .team-entrants:has(.entrant-team:nth-child(5)) { gri
 body.portrait .select .select-top { flex-wrap: wrap; }
 body.portrait .select .modes { width: 100%; margin-left: 0; }
 body.portrait .select .modes button { flex: 1; padding-inline: 5px; }
-body.portrait .select .sel-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+body.portrait .select .sel-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(135px, 1fr) auto; min-height: min-content; }
 body.portrait .select .grid { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
 body.portrait .select .team-entrants { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 500px; }
 body.portrait .select .setup-start { flex: 1 1 100%; justify-content: space-between; }
 body.portrait .select .setup-start .hint { order: 0; flex-basis: auto; text-align: left; }
 body.portrait .select .t-setup .ent, body.portrait .select .t-setup .ent.empty { min-height: 22px; }
 body.portrait .select .t-setup .ent img, body.portrait .select .t-setup .ent svg { max-width: 22px; }
-@media (max-height: 600px) {
-  body.portrait #panel.wide:has(> .select) { overflow-y: auto; }
-  body.portrait .select { height: auto; min-height: 100%; }
-  body.portrait .select .sel-body { grid-template-rows: minmax(135px, 1fr) auto; }
-}
+body.portrait #panel.wide:has(> .select) { overflow-y: auto; }
+body.portrait .select { height: auto; min-height: 100%; }
 
 #draft.show { animation: none; background: rgba(21, 16, 15, .86); overflow-y: auto; align-items: safe center; }
 .dr-box { width: min(740px, calc(100% - 24px)); gap: clamp(8px, 1vw, 14px); margin: 12px 0; }

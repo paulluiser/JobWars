@@ -100,7 +100,6 @@ export function setMode(st: SelectState, mode: Mode) {
  */
 export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: SelectResult) => void, onMode?: (m: Mode) => void) {
   let hintFlash = '';
-  let profile: 'skills' | 'stats' = 'skills';
   let skill: SkillKind = 'passive';
   const tabs = (Object.keys(MODE_LABEL) as Mode[]).map((m) =>
     `<button data-mode="${m}" role="tab">${MODE_LABEL[m]}</button>`).join('');
@@ -233,22 +232,20 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
     update(detail, `<div class="d-head">
         <div class="d-face" style="background:${hex(focus.color)}">${face(focus, 'icon')}</div>
         <div><div class="d-name">${esc(focus.displayName)}</div>
-        <div class="d-identity">${esc(focus.name)} <span class="d-role">${focus.role}</span></div></div>
+        <div class="d-identity">${esc(focus.name)} <span class="d-role">${focus.role}</span></div>
+        <div class="d-title">${esc(focus.title)} · covers ${esc(focus.mergedFrom)}</div>
+        <p class="d-quirk">${esc(focus.quirk)}</p></div>
       </div>
+      <div class="profile-stats">${statBars(focus)}</div>
       <div class="profile-toolbar">
-        <div class="seg" role="group" aria-label="Fighter profile">
-          <button data-sel="skills" class="${profile === 'skills' ? 'on' : ''}" aria-pressed="${profile === 'skills'}">Skills</button>
-          <button data-sel="stats" class="${profile === 'stats' ? 'on' : ''}" aria-pressed="${profile === 'stats'}">Stats</button>
-        </div>
-        ${profile === 'skills' ? `<div class="seg" role="group" aria-label="Description detail">
+        <div class="skill-tabs" role="group" aria-label="Choose a skill">${kinds.map((kind) =>
+          `<button data-inspect="${kind}" aria-pressed="${skill === kind}">${kind}</button>`).join('')}</div>
+        <div class="seg" role="group" aria-label="Description detail">
           <button data-sel="simple" class="${detailed ? '' : 'on'}" aria-pressed="${!detailed}">Simple</button>
           <button data-sel="detailed" class="${detailed ? 'on' : ''}" aria-pressed="${detailed}">Detailed</button>
-        </div>` : ''}
+        </div>
       </div>
-      ${profile === 'stats' ? `<div class="profile-stats">${statBars(focus)}<p class="d-quirk">${esc(focus.quirk)}</p></div>`
-        : detailed ? `<div class="skill-tabs" role="group" aria-label="Choose a skill">${kinds.map((kind) =>
-          `<button data-inspect="${kind}" aria-pressed="${skill === kind}">${kind}</button>`).join('')}</div>${ability(skill)}`
-          : `<div class="skill-list">${kinds.map(ability).join('')}</div>`}
+      ${ability(skill)}
     `);
 
     const position = `${teamOf(st, slot) ? 'Red' : 'Blue'}${tag ? ` ${slot % 2 + 1}` : ''}`;
@@ -307,10 +304,6 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
       }
     } else {
       switch (d.sel) {
-        case 'skills':
-        case 'stats':
-          profile = d.sel;
-          break;
         case 'simple':
         case 'detailed':
           st.detailed = d.sel === 'detailed';
