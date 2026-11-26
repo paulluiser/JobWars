@@ -1,5 +1,6 @@
 import type { Aug } from '../data/cards';
 export type Team = 0 | 1;
+export type BattleSide = Team | 2 | 3 | 4;
 
 export type FighterState =
   | 'move' // bouncing, between swings
@@ -67,6 +68,8 @@ export interface FighterDef {
   skin: number;
   hp: number;
   atk: number;
+  /** Skill power, when a job's kit is balanced separately from its swings. */
+  skillAtk?: number;
   def: number;
   /** cruise speed of the bouncing ball, px/s */
   speed: number;
@@ -116,7 +119,7 @@ export interface FighterStats {
 
 export interface Fighter {
   idx: number;
-  team: Team;
+  team: BattleSide;
   def: FighterDef;
   x: number;
   y: number;
@@ -207,7 +210,7 @@ export type SimEvent =
   /** gacha: the fight pauses for a card pick (n = pick number, 1-based) */
   | { type: 'surge'; n: number }
   /** a card was added to a team (draft or surge) */
-  | { type: 'card'; team: Team; id: string }
+  | { type: 'card'; team: BattleSide; id: string }
   /** a card effect went off: Golden Parachute, Phoenix, Chain Reaction, Lightning Rod, … */
   | { type: 'proc'; a: number; card: string; b?: number }
   /** gacha overtime begins: damage ramps up, healing halves */
@@ -216,4 +219,4 @@ export type SimEvent =
   | { type: 'hazard'; action: 'spawn' | 'trigger' | 'expire'; id: number; kind: Hazard['kind']; x: number; y: number }
   | { type: 'shieldHit'; b: number; absorbed: number }
   | { type: 'ko'; b: number }
-  | { type: 'end'; winner: Team | -1; reason: 'ko' | 'time' };
+  | { type: 'end'; winner: BattleSide | -1; reason: 'ko' | 'time' };

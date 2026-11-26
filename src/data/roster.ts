@@ -213,16 +213,52 @@ const FISHER: FighterDef = {
   },
 };
 
-/** designed stats × the tuner's multipliers (src/data/balance.ts) */
-const tuned = (d: FighterDef): FighterDef => {
-  const b = BALANCE[d.id];
-  return b ? { ...d, atk: Math.round(d.atk * b.atk), hp: Math.round((d.hp * b.hp) / 10) * 10 } : d;
+const ROLE_REACH: Record<FighterDef['role'], number> = {
+  Assassin: 141,
+  Tank: 139,
+  Fighter: 156,
+  Controller: 158,
+  Mage: 185,
+  Support: 178,
+  Marksman: 201,
 };
 
-/** designed kit + text, with stats from the job's attribute profile (src/data/attributes.ts) */
-const profiled = (d: FighterDef): FighterDef => (RATINGS[d.id] ? { ...d, ...statsFromRatings(RATINGS[d.id]) } : d);
+const ROLE_ATTACK: Partial<Record<FighterDef['role'], { center: number; spread: number }>> = {
+  Fighter: { center: 126, spread: 0.6 },
+  Controller: { center: 125, spread: 0.6 },
+  Mage: { center: 104, spread: 0.25 },
+  Support: { center: 103, spread: 0.25 },
+  Marksman: { center: 108, spread: 0.25 },
+};
+
+/** Calibrate swing damage by role while keeping the tuned strength of each kit. */
+export const applyJobBalance = (d: FighterDef, b = BALANCE[d.id] ?? { atk: 1, hp: 1 }): FighterDef => {
+  const attack = d.atk * b.atk;
+  const role = ROLE_ATTACK[d.role];
+  const atk = role ? role.center + (attack - 120) * role.spread : attack;
+  return {
+    ...d,
+    atk: Math.round(atk),
+    skillAtk: role ? Math.round(attack) : undefined,
+    hp: Math.round((d.hp * b.hp) / 10) * 10,
+  };
+};
+
+/** Keep the individual ratings within the reach and movement profile for the job's role. */
+const profiled = (d: FighterDef): FighterDef => {
+  const p = { ...d, ...statsFromRatings(RATINGS[d.id]) };
+  p.range = Math.round(ROLE_REACH[p.role] + (p.range - 154) * 0.38);
+  if (p.role === 'Assassin') {
+    p.speed += 45;
+    p.windup *= 0.86;
+    p.recover *= 0.86;
+    p.attackCooldown *= 0.86;
+  }
+  if (p.role === 'Tank') p.def += 4;
+  return p;
+};
 
 export const DESIGNED: FighterDef[] = [CHEF, FIREFIGHTER, ELECTRICIAN, NURSE, COURIER, FISHER, ...ROSTER2].map(profiled);
-export const ROSTER: FighterDef[] = DESIGNED.map(tuned);
+export const ROSTER: FighterDef[] = DESIGNED.map((d) => applyJobBalance(d));
 
 export const byId = (id: string) => ROSTER.find((d) => d.id === id);

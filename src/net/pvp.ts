@@ -4,6 +4,7 @@ import { CARD_BY_ID, GACHA } from '../data/cards';
 import { pvpIceConfig } from './ice';
 import { PVP_MODES, type PvpMode } from './pvpModes';
 import { ROOM_RULES } from './roomVersion';
+import { normalizeDisplayName } from './roomWire';
 export { PVP_MODES, type PvpMode } from './pvpModes';
 
 /**
@@ -19,9 +20,10 @@ export { PVP_MODES, type PvpMode } from './pvpModes';
 export const PROTOCOL = `jw3-${ROOM_RULES}`;
 
 export type Msg =
-  | { t: 'hello'; v: string; mmr: number; mode: PvpMode }
+  | { t: 'hello'; v: string; mmr: number; mode: PvpMode; displayName?: string }
   | { t: 'picks'; ids: string[] }
-  | { t: 'start'; seed: number }
+  | { t: 'unlock' }
+  | { t: 'start'; seed: number; lineups: [string[], string[]] }
   | { t: 'card'; team: number; pick: number; reroll: number; id: string }
   | { t: 'result'; winner: number; hash: string }
   | { t: 'rematch' }
@@ -30,21 +32,23 @@ export type Msg =
 function validMessage(value: unknown, mode: PvpMode): value is Msg {
   if (!value || typeof value !== 'object' || !('t' in value)) return false;
   const m = value as Msg;
+  const validLineup = (ids: unknown): ids is string[] => Array.isArray(ids) && ids.length === (PVP_MODES[mode].tag ? 2 : 1)
+    && new Set(ids).size === ids.length && ids.every((id) => typeof id === 'string' && !!byId(id));
   switch (m.t) {
     case 'hello':
       return typeof m.v === 'string' && Number.isSafeInteger(m.mmr)
         && typeof m.mode === 'string' && Object.hasOwn(PVP_MODES, m.mode);
     case 'picks':
-      return Array.isArray(m.ids) && m.ids.length === (PVP_MODES[mode].tag ? 2 : 1)
-        && m.ids.every((id) => typeof id === 'string' && !!byId(id));
+      return validLineup(m.ids);
     case 'start':
-      return Number.isSafeInteger(m.seed);
+      return Number.isSafeInteger(m.seed) && Array.isArray(m.lineups) && m.lineups.length === 2 && m.lineups.every(validLineup);
     case 'card':
       return PVP_MODES[mode].gacha && (m.team === 0 || m.team === 1) && Number.isSafeInteger(m.pick) && m.pick >= 0
         && Number.isSafeInteger(m.reroll) && m.reroll >= 0 && m.reroll <= GACHA.rerolls && CARD_BY_ID.has(m.id);
     case 'result':
       return (m.winner === -1 || m.winner === 0 || m.winner === 1)
         && typeof m.hash === 'string' && m.hash.length <= 128;
+    case 'unlock':
     case 'bye':
     case 'rematch':
       return true;
@@ -63,6 +67,8 @@ const peerErrorType = (error: unknown) => (error as { type?: string } | null)?.t
 
 export class PvpSession {
   oppMmr = 1000;
+  playerName = '';
+  oppName = '';
   private handlers = new Set<(m: Msg) => void>();
   private inbox: Msg[] = [];
   private established = false;
@@ -73,6 +79,10 @@ export class PvpSession {
     conn.on('data', (m) => {
       if (this.closed || !validMessage(m, this.mode)) return;
       if (m.t === 'bye') return this.lost();
+      if (m.t === 'rematch') {
+        // The ordered channel has already delivered the previous round's pick messages.
+        this.inbox = this.inbox.filter((pending) => pending.t !== 'picks' && pending.t !== 'unlock' && pending.t !== 'start');
+      }
       if (this.inbox.length === 64) this.inbox.shift();
       this.inbox.push(m);
       for (const h of [...this.handlers]) h(m);
@@ -82,6 +92,7 @@ export class PvpSession {
   }
 
   get mode() { return this.matchMode; }
+  get playerNames(): [string, string] { return this.host ? [this.playerName, this.oppName] : [this.oppName, this.playerName]; }
 
   private lost() {
     if (this.closed) return;
@@ -138,9 +149,10 @@ export class PvpSession {
   }
 
   /** after connecting: swap versions and ratings */
-  private async handshake(mmr: number, signal?: AbortSignal, invite = false) {
+  private async handshake(mmr: number, signal: AbortSignal, displayName?: string, invite = false) {
     const followHost = invite && !this.host;
-    const hello = () => this.send({ t: 'hello', v: PROTOCOL, mmr, mode: this.mode });
+    this.playerName = normalizeDisplayName(displayName) ?? (this.host ? 'Player 1' : 'Player 2');
+    const hello = () => this.send({ t: 'hello', v: PROTOCOL, mmr, mode: this.mode, displayName: this.playerName });
     if (!followHost) hello();
     const h = await this.wait((m): m is Extract<Msg, { t: 'hello' }> => m.t === 'hello', 8000, signal);
     if (h.v !== PROTOCOL) throw new Error('The other player is on a different version of the game. Both refresh the page and try again.');
@@ -150,6 +162,7 @@ export class PvpSession {
       hello();
     }
     this.oppMmr = h.mmr;
+    this.oppName = normalizeDisplayName(h.displayName) ?? (this.host ? 'Player 2' : 'Player 1');
     if (this.closed) throw new Error("The other player disconnected.");
     this.established = true;
     return this;
@@ -162,13 +175,13 @@ export class PvpSession {
   }
 
   /** Host a lobby: resolves with the code at once; `ready` resolves when someone joins. */
-  static async createLobby(mode: PvpMode, mmr: number, signal: AbortSignal): Promise<{ code: string; ready: Promise<PvpSession> }> {
+  static async createLobby(mode: PvpMode, mmr: number, signal: AbortSignal, displayName?: string): Promise<{ code: string; ready: Promise<PvpSession> }> {
     for (let attempt = 0; attempt < 4; attempt++) {
       const code = PvpSession.newCode();
       const peer = await claimPeer(`${PREFIX}-lobby-${code}`, signal);
       if (!peer) continue;
       const ready = waitIncoming(peer, signal)
-        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr, signal, true))
+        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr, signal, displayName, true))
         .catch((error: unknown) => {
           peer.destroy();
           throw error;
@@ -178,7 +191,7 @@ export class PvpSession {
     throw new Error("Couldn't reserve a lobby code. Try creating a lobby again.");
   }
 
-  static async joinLobby(code: string, mode: PvpMode, mmr: number, signal = new AbortController().signal): Promise<PvpSession> {
+  static async joinLobby(code: string, mode: PvpMode, mmr: number, signal = new AbortController().signal, displayName?: string): Promise<PvpSession> {
     const normalized = code.trim().toUpperCase();
     const me = await openPeer(guestId(), signal).catch(() => {
       throw signal.aborted ? cancelled() : matchmakingUnavailable();
@@ -194,7 +207,7 @@ export class PvpSession {
         }
         throw new Error(`Connection to lobby ${normalized} was interrupted. Try joining again.`);
       });
-      return await new PvpSession([me], conn, false, mode).handshake(mmr, signal, true);
+      return await new PvpSession([me], conn, false, mode).handshake(mmr, signal, displayName, true);
     } catch (error) {
       me.destroy();
       throw error;
@@ -205,7 +218,7 @@ export class PvpSession {
    * Quick match: look for someone waiting in your rank tier, else wait in a free slot.
    * `status` reports progress; after ~20 s it widens to nearby tiers.
    */
-  static async quickMatch(mode: PvpMode, mmr: number, tier: number, signal: AbortSignal, status: (s: string) => void): Promise<PvpSession> {
+  static async quickMatch(mode: PvpMode, mmr: number, tier: number, signal: AbortSignal, status: (s: string) => void, displayName?: string): Promise<PvpSession> {
     const started = Date.now();
     const nearby = [tier - 1, tier + 1, tier - 2, tier + 2].filter((t) => t >= 0 && t <= 6);
     let nextNearby = 0;
@@ -218,7 +231,7 @@ export class PvpSession {
       const conn = await dial(guest, id, signal).catch(() => null);
       if (!conn) return null;
       try {
-        const session = await new PvpSession([guest], conn, false, mode).handshake(mmr, signal);
+        const session = await new PvpSession([guest], conn, false, mode).handshake(mmr, signal, displayName);
         matched = true;
         return session;
       } catch {
@@ -247,7 +260,7 @@ export class PvpSession {
           status('Waiting for an opponent…');
           try {
             const conn = await waitIncoming(host, signal, 20000);
-            return await new PvpSession([host], conn, true, mode).handshake(mmr, signal);
+            return await new PvpSession([host], conn, true, mode).handshake(mmr, signal, displayName);
           } catch (error) {
             host.destroy();
             if (signal.aborted || (error instanceof Error && error.message.includes('disconnected'))) throw error;

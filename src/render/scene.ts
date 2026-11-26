@@ -4,7 +4,7 @@ import { DEFAULT_ARENA, type ArenaId } from '../data/arenas';
 import { DEPTH } from './depth';
 import { ARENA_H, ARENA_W } from '../sim/constants';
 import type { Sim } from '../sim/sim';
-import { FighterView } from './fighterView';
+import { FighterView, ROYALE_FIGHTER_SCALE } from './fighterView';
 import { Fx } from './fx';
 import type { Juice } from './juice';
 
@@ -36,6 +36,7 @@ export class Scene {
 
   private entities = new Container();
   private overFx = new Container();
+  private castLabels = new Container();
   private groundLayer!: Container;
   fx!: Fx;
   views: FighterView[] = [];
@@ -66,9 +67,12 @@ export class Scene {
     this.entities.sortableChildren = true;
     const groundFx = new Container();
     this.groundLayer = groundFx;
-    this.world.addChild(this.floor, groundFx, this.entities, this.overFx);
+    this.world.addChild(this.floor, groundFx, this.entities, this.overFx, this.castLabels);
     this.app.stage.addChild(this.world);
-    this.fx = new Fx(this.app.renderer, groundFx, this.overFx);
+    this.fx = new Fx(this.app.renderer, groundFx, this.overFx, this.castLabels, () => {
+      const { ah } = this.fit();
+      return this.camY - ah / (2 * this.zoom * (1 + this.juice.punch) * DEPTH.k);
+    });
     this.arena = arenaArt();
     this.drawArena();
     this.snapCamera();
@@ -186,7 +190,8 @@ export class Scene {
 
   setFighters(sim: Sim) {
     for (const v of this.views) v.root.destroy({ children: true });
-    this.views = sim.fighters.map((f) => new FighterView(f, this.fx, this.juice));
+    const size = sim.opts.royale ? ROYALE_FIGHTER_SCALE : 1;
+    this.views = sim.fighters.map((f) => new FighterView(f, this.fx, this.juice, size));
     for (const v of this.views) this.entities.addChild(v.root);
     this.fx.clear();
     for (const g of this.hazardViews.values()) g.destroy();
@@ -454,7 +459,7 @@ export class Scene {
     this.zoom += (tz - this.zoom) * k;
 
     const j = this.juice;
-    const z = this.zoom * (1 + j.punch);
+    const z = this.zoom * (1 + j.punch * (sim.opts.royale ? 0.45 : 1));
     this.world.pivot.set(this.camX, this.camY);
     this.world.position.set(fit.sx + j.shakeX, fit.sy + j.shakeY);
     this.world.scale.set(z, z * DEPTH.k);

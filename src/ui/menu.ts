@@ -1,3 +1,6 @@
+import { MAX_DISPLAY_NAME_LENGTH, type RoomView } from '../net/roomWire';
+import { fighterProfileHtml, ROLE_COLORS } from './screens';
+import type { SkillKind } from './skillArt';
 import { ROSTER } from '../data/roster';
 import { PVP_MODES, type PvpMode } from '../net/pvp';
 import { RANKS, rankOf, type Profile } from '../modes/mmr';
@@ -30,13 +33,17 @@ function show(panel: HTMLElement, html: string, onClick: (t: HTMLElement) => voi
   const focused = document.activeElement;
   const previous = focused instanceof HTMLButtonElement && panel.contains(focused) ? focused.dataset : null;
   const surface = panel.firstElementChild?.classList[0];
+  const rosterScroll = panel.querySelector<HTMLElement>('.roster-scroll')?.scrollTop ?? 0;
   panel.innerHTML = html;
   panel.onclick = (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-m]');
     if (t && !(t as HTMLButtonElement).disabled) onClick(t);
   };
   panel.classList.add('show', 'wide');
-  if (previous && surface === panel.firstElementChild?.classList[0]) {
+  if (surface !== panel.firstElementChild?.classList[0]) return;
+  const roster = panel.querySelector<HTMLElement>('.roster-scroll');
+  if (roster) roster.scrollTop = rosterScroll;
+  if (previous) {
     [...panel.querySelectorAll<HTMLButtonElement>('button[data-m]:enabled')].find((button) =>
       button.dataset.m === previous.m && button.dataset.v === previous.v)?.focus({ preventScroll: true });
   }
@@ -44,7 +51,7 @@ function show(panel: HTMLElement, html: string, onClick: (t: HTMLElement) => voi
 
 // ---------------- main menu ----------------
 
-export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress, go: (where: 'pvp' | 'story' | 'cpu') => void) {
+export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress, go: (where: 'pvp' | 'story' | 'cpu' | 'heroes') => void) {
   const cleared = LEVELS.filter((l) => (story.stars[l.id] ?? 0) > 0).length;
   const portrait = document.body.classList.contains('portrait');
   const poster = posterUrl(portrait);
@@ -55,6 +62,7 @@ export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress
     <div class="menu">
       <div class="m-bg">${poster ? `<div class="m-poster" style="background-image:url('${poster}')"></div>` : `<div class="m-crowd">${order.slice(0, 6).map((d, i) => `<span style="--i:${i}">${face(d, 'bust')}</span>`).join('')}</div>`}</div>
       <button class="m-settings" data-act="settings">Settings</button>
+      <button class="m-heroes" data-m="heroes">View all heroes</button>
       <div class="m-top">
         <div class="m-title"><span>JOB</span><span>WARS</span></div>
         <div class="m-sub">Real jobs. Real fights. Pick a shift.</div>
@@ -63,7 +71,7 @@ export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress
         <button class="m-card pvp" data-m="pvp" style="--i:0">
           <span class="m-strap"></span>${emblem('mode-pvp', '⚔️', 'm-icon')}
           <span class="m-name">Player vs Player</span>
-          <span class="m-desc">Classic or Gacha, 1v1 or Tag Team. Quick match or a lobby code.</span>
+          <span class="m-desc">Classic or Gacha. Duel, Tag Team, or Battle Royale.</span>
           <span class="m-meta">${rankBadge(profile.mmr)} · ${profile.wins}W ${profile.losses}L</span>
         </button>
         <button class="m-card story" data-m="story" style="--i:1">
@@ -81,7 +89,7 @@ export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress
       </div>
       <div class="m-feature" aria-hidden="true">${order.map((d, i) => `<div class="mf" style="--i:${i}"><div class="mf-bust">${face(d, 'bust')}</div><div class="mf-tag"><b>${esc(d.displayName)}</b><span>${esc(d.name)} · ${esc(d.role)}</span></div></div>`).join('')}</div>
       <div class="m-foot"><span class="rank-chip" style="--rk:${r.color}">${rankEmblem(r.name)} ${r.name}</span><span>Esc: menu · B: cards · K: share · F: fighters</span></div>
-    </div>`, (t) => go(t.dataset.m as 'pvp' | 'story' | 'cpu'));
+    </div>`, (t) => go(t.dataset.m as 'pvp' | 'story' | 'cpu' | 'heroes'));
   // cards lean toward the pointer
   for (const card of panel.querySelectorAll<HTMLElement>('.m-card')) {
     card.addEventListener('pointermove', (e) => {
@@ -106,6 +114,7 @@ export type SettingsView = {
 };
 
 export function renderSettings(panel: HTMLElement, settings: SettingsView, back: () => void) {
+  const poster = posterUrl(document.body.classList.contains('portrait'));
   const setting = (key: keyof SettingsView, label: string, description: string, options: [string, string][]) => `
     <label class="setting-row">
       <span><b>${label}</b><small>${description}</small></span>
@@ -114,6 +123,7 @@ export function renderSettings(panel: HTMLElement, settings: SettingsView, back:
   const toggles: [string, string][] = [['on', 'On'], ['off', 'Off']];
   show(panel, `
     <section class="settings desk-screen">
+      <div class="settings-backdrop" aria-hidden="true" ${poster ? `style="--settings-art:url('${poster}')"` : ''}></div>
       <header class="desk-head"><button class="back" data-m="back" aria-label="Menu">Menu</button><h2 tabindex="-1">Settings</h2></header>
       <div class="desk-sheet settings-sheet">
         ${setting('sound', 'Sound', 'Music and sound effects.', toggles)}
@@ -130,6 +140,7 @@ export function renderSettings(panel: HTMLElement, settings: SettingsView, back:
 
 export interface PvpView {
   mode: PvpMode;
+  playerName: string;
   profile: Profile;
   status: string;
   code: string;
@@ -143,10 +154,12 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
   const joinField = panel.querySelector<HTMLInputElement>('#joincode');
   const joinCode = joinField?.value ?? '';
   const joining = joinField && joinField === document.activeElement;
-  const modes = (Object.keys(PVP_MODES) as PvpMode[]).map((m) => {
-    const {tag, gacha} = PVP_MODES[m];
+  const editingName = panel.querySelector('#playername') === document.activeElement;
+  const mode = PVP_MODES[v.mode];
+  const modes = (Object.keys(PVP_MODES) as PvpMode[]).filter((m) => roomHosted || !PVP_MODES[m].royale).map((m) => {
+    const {tag, gacha, royale} = PVP_MODES[m];
     return `<button class="match-mode" data-m="mode" data-v="${m}" aria-pressed="${m === v.mode}" ${v.busy ? 'disabled' : ''}>
-      <b>${gacha ? 'Gacha' : 'Classic'} ${tag ? '2v2' : '1v1'}</b><span>${tag ? 'Tag team' : 'Duel'}</span>
+      <b>${gacha ? 'Gacha' : 'Classic'} ${royale ? '' : tag ? '2v2' : '1v1'}</b><span>${royale ? 'Battle Royale · 3–5' : tag ? 'Tag team' : 'Duel'}</span>
     </button>`;
   }).join('');
   const hist = v.profile.history.slice(0, 6).map((h) => `<span class="h-${h.result}">${h.result} ${h.delta >= 0 ? '+' : ''}${h.delta}</span>`).join('') || '<em>No matches yet</em>';
@@ -158,7 +171,7 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
           <section aria-labelledby="format-title">
             <h3 id="format-title">Match format</h3>
             <div class="match-modes">${modes}</div>
-            <p class="match-description">${PVP_MODES[v.mode].gacha ? `Draft a card every ${GACHA.surgeEvery} seconds.` : 'Fighters battle without cards.'}</p>
+            <p class="match-description">${mode.royale ? `${mode.blurb} Unranked.` : mode.gacha ? `Draft a card every ${GACHA.surgeEvery} seconds.` : 'Fighters battle without cards.'}</p>
           </section>
           <div class="match-record">
             <div class="record-rank">${rankEmblem(r.name)}<div><b>${r.name} · ${v.profile.mmr} MMR</b><span>${next ? `${next.min - v.profile.mmr} to ${next.name}` : 'Top rank'}</span></div></div>
@@ -167,9 +180,12 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
           </div>
         </div>
         <section class="match-actions" aria-labelledby="lobby-title">
-          <h3 id="lobby-title">Find an opponent</h3>
-          <button class="primary big" data-m="quick" ${v.busy ? 'disabled' : ''}>Quick match</button>
-          <button data-m="host" ${v.busy ? 'disabled' : ''}>Create a lobby</button>
+          <h3 id="lobby-title">${mode.royale ? 'Invite your friends' : 'Find an opponent'}</h3>
+          <label class="player-name" for="playername">Display name
+            <input id="playername" maxlength="${MAX_DISPLAY_NAME_LENGTH}" value="${esc(v.playerName)}" placeholder="Your name" autocomplete="nickname" ${v.busy ? 'disabled' : ''} required>
+          </label>
+          ${mode.royale ? '' : `<button class="primary big" data-m="quick" ${v.busy ? 'disabled' : ''}>Quick match</button>`}
+          <button class="${mode.royale ? 'primary big' : ''}" data-m="host" ${v.busy ? 'disabled' : ''}>Create a lobby</button>
           <div class="lobby-join">
             <label for="joincode">Lobby code</label>
             <div class="join"><input id="joincode" maxlength="5" placeholder="5 characters" value="${esc(joinCode)}" autocomplete="off" autocapitalize="characters" spellcheck="false" ${v.busy ? 'disabled' : ''}><button data-m="join" ${v.busy ? 'disabled' : ''}>Join</button></div>
@@ -184,6 +200,9 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
     if (t.dataset.m === 'join') act('join', (panel.querySelector('#joincode') as HTMLInputElement).value);
     else act(t.dataset.m!, t.dataset.v);
   });
+  const nameInput = panel.querySelector<HTMLInputElement>('#playername')!;
+  if (editingName && !v.busy) nameInput.focus({ preventScroll: true });
+  nameInput.addEventListener('input', () => act('playername', nameInput.value));
   const input = panel.querySelector<HTMLInputElement>('#joincode');
   if (joining && !v.busy) input?.focus({ preventScroll: true });
   input?.addEventListener('keydown', (e) => {
@@ -193,20 +212,109 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
   input?.addEventListener('input', () => (input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '')));
 }
 
-/** Pick your own fighter(s) for a PvP match; the opponent's choice stays hidden until the fight. */
-export function renderPvpPick(panel: HTMLElement, opts: { need: number; picks: FighterDef[]; oppReady: boolean; ready: boolean; oppMmr: number; myMmr: number; mode: PvpMode }, act: (a: string, id?: string) => void) {
+export interface HeroPreview {
+  fighter?: FighterDef;
+  detailed: boolean;
+  skill: SkillKind;
+}
+
+function previewHtml(state: HeroPreview) {
+  const fighter = state.fighter ?? ROSTER[0];
+  return `<aside class="detail fighter-profile" aria-label="Fighter profile" style="--rc:${ROLE_COLORS[fighter.role]}">${fighterProfileHtml(fighter, state.detailed, state.skill)}</aside>`;
+}
+
+function bindHeroPreview(panel: HTMLElement, state: HeroPreview) {
+  const preview = panel.querySelector<HTMLElement>('.fighter-profile')!;
+  preview.onclick = (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-inspect], button[data-sel]');
+    if (!button) return;
+    if (button.dataset.inspect) state.skill = button.dataset.inspect as SkillKind;
+    else state.detailed = button.dataset.sel === 'detailed';
+    const selector = button.dataset.inspect ? `[data-inspect="${state.skill}"]` : `[data-sel="${button.dataset.sel}"]`;
+    preview.innerHTML = fighterProfileHtml(state.fighter ?? ROSTER[0], state.detailed, state.skill);
+    preview.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+  };
+}
+
+export function renderHeroLibrary(panel: HTMLElement, detailed: boolean, back: () => void) {
+  const preview: HeroPreview = { fighter: ROSTER[0], skill: 'passive', detailed };
+  const draw = () => {
+    show(panel, `
+      <section class="hero-index desk-screen">
+        <header class="desk-head"><button class="back" data-m="back" aria-label="Menu">Menu</button><h2>All heroes</h2></header>
+        <div class="desk-sheet hero-picker">
+          <div class="grid mini-grid roster-scroll" aria-label="Heroes">${ROSTER.map((d) => crewButton(d, d === preview.fighter)).join('')}</div>
+          ${previewHtml(preview)}
+        </div>
+      </section>`, (button) => {
+      if (button.dataset.m === 'back') return back();
+      preview.fighter = byId(button.dataset.v!);
+      draw();
+    });
+    bindHeroPreview(panel, preview);
+  };
+  draw();
+}
+
+export function renderRoyaleLobby(panel: HTMLElement, view: RoomView, code: string, pick: FighterDef | undefined, notice: string, preview: HeroPreview, act: (action: string, id?: string) => void) {
+  const occupied = view.occupied ?? [];
+  const joined = occupied.filter(Boolean).length;
+  const ready = occupied.filter((taken, i) => taken && view.present[i] && view.ready[i]).length;
+  const locked = view.ready[view.team];
+  const roster = ROSTER.map((d) => crewButton(d, pick === d, !!locked)).join('');
+  show(panel, `
+    <section class="royale-lobby desk-screen">
+      <header class="desk-head">
+        <button class="back" data-m="leave">Leave</button><h2>${PVP_MODES[view.mode].name}</h2>
+      </header>
+      <div class="desk-sheet royale-desk">
+        <section class="royale-seats">
+          <div class="lobby-code">Invite code <b>${esc(code)}</b><button data-m="copycode">Copy</button></div>
+          <ol aria-label="Lobby seats">${occupied.map((taken, i) => `
+            <li><b>${taken ? esc(view.playerNames[i] || `Player ${i + 1}`) : `Seat ${i + 1}`}${i === view.team ? ' (you)' : i === 0 && taken ? ' (host)' : ''}</b>
+            <span>${!taken ? 'Open' : !view.present[i] ? 'Reconnecting' : view.ready[i] ? 'Ready' : 'Choosing'}</span></li>`).join('')}</ol>
+        </section>
+        <div class="royale-picks hero-picker">
+          <div class="grid mini-grid roster-scroll" aria-label="Choose a fighter">${roster}</div>
+          ${previewHtml(preview)}
+        </div>
+      </div>
+      <footer class="brief-footer">
+        <span role="status">${esc(notice || (joined < 3 ? `${joined}/5 players · 3 needed`
+          : ready < joined ? `${ready}/${joined} ready`
+          : view.team === 0 ? `${ready} players ready` : 'Waiting for the host to start'))}</span>
+        <div class="royale-actions">${lockControls(!!locked, !pick || !!notice)}
+        ${view.team === 0 ? `<button class="primary big" data-m="start" ${joined < 3 || ready < joined || notice ? 'disabled' : ''}>Start battle</button>` : ''}</div>
+      </footer>
+    </section>`, (button) => act(button.dataset.m!, button.dataset.v));
+  bindHeroPreview(panel, preview);
+}
+
+function lockControls(locked: boolean, unavailable: boolean) {
+  return `<button class="primary" data-m="ready" ${locked || unavailable ? 'disabled' : ''}>${locked ? 'Locked' : 'Lock in'}</button>
+    ${locked ? `<button data-m="unlock" ${unavailable ? 'disabled' : ''}>Unlock hero</button>` : ''}`;
+}
+
+/** Opponent choices stay hidden until both sides lock in. */
+export function renderPvpPick(panel: HTMLElement, opts: {
+  need: number; picks: FighterDef[]; oppReady: boolean; ready: boolean; mode: PvpMode;
+  myName: string; oppName: string; preview: HeroPreview;
+}, act: (action: string, id?: string) => void) {
   const grid = ROSTER.map((d) => crewButton(d, opts.picks.includes(d), opts.ready)).join('');
   const slots = Array.from({ length: opts.need }, (_, i) => opts.picks[i]
-    ? fighterSlot(opts.picks[i]) : `<span class="pslot empty">?</span>`).join('');
+    ? fighterSlot(opts.picks[i]) : `<span class="pslot empty">Open slot</span>`).join('');
   show(panel, `
-    <div class="pvp-pick">
-      <div class="sub-head"><button class="back" data-m="leave">‹ Leave</button><h2>${PVP_MODES[opts.mode].name}</h2>
-        <div class="vsline">${rankBadge(opts.myMmr)} <i>vs</i> ${rankBadge(opts.oppMmr)}</div></div>
-      <div class="pp-slots">${slots}<span class="pp-opp ${opts.oppReady ? 'ok' : ''}">${opts.oppReady ? 'Opponent is ready' : 'Opponent is choosing…'}</span></div>
-      <div class="grid mini-grid">${grid}</div>
-      <div class="sel-foot"><span class="hint">${opts.ready ? 'Locked in. Waiting for your opponent…' : `Pick ${opts.need === 2 ? 'two jobs' : 'a job'}. Your opponent won’t see it until the fight.`}</span>
-        <button class="primary big" data-m="ready" ${opts.picks.length === opts.need && !opts.ready ? '' : 'disabled'}>Lock in</button></div>
-    </div>`, (t) => act(t.dataset.m!, t.dataset.v));
+    <section class="pvp-pick desk-screen">
+      <header class="desk-head"><button class="back" data-m="leave">Leave</button><h2>${PVP_MODES[opts.mode].name}</h2></header>
+      <div class="pick-status"><b>${esc(opts.myName)} (you)</b><div class="pp-slots">${slots}</div>
+        <span role="status">${opts.oppReady ? `${esc(opts.oppName)} is ready`
+          : opts.ready ? `<i class="spin" aria-hidden="true"></i> Waiting for ${esc(opts.oppName)} to lock in…`
+          : `${esc(opts.oppName)} is choosing…`}</span></div>
+      <div class="desk-sheet hero-picker"><div class="grid mini-grid roster-scroll" aria-label="Choose a fighter">${grid}</div>${previewHtml(opts.preview)}</div>
+      <footer class="brief-footer"><span>Choose ${opts.need === 2 ? 'two fighters' : 'one fighter'}</span>
+        <div class="royale-actions">${lockControls(opts.ready, opts.picks.length !== opts.need)}</div></footer>
+    </section>`, (button) => act(button.dataset.m!, button.dataset.v));
+  bindHeroPreview(panel, opts.preview);
 }
 
 // ---------------- Story ----------------

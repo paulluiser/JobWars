@@ -85,6 +85,22 @@ describe('gacha matches', () => {
     }
   });
 
+  it('offers cards to the fifth side and keeps a knocked-out side out of live drafts', () => {
+    const teams = ROSTER.slice(0, 5).map((fighter) => [fighter]);
+    const start = offersFor(42, 4, 0, 0, teams[4], []).map((card) => card.id);
+    expect(start).toHaveLength(3);
+    expect(offersFor(42, 4, 0, 0, teams[4], []).map((card) => card.id)).toEqual(start);
+    const sim = new Sim(teams, 42, { royale: true, surgeEvery: 0.01 });
+    const [first, , , , last] = sim.fighters;
+    sim.damage(first, first.maxHp * 2, last.idx);
+    sim.step();
+    expect(sim.step()).toContainEqual({ type: 'surge', n: 1 });
+    expect(sim.livingSides()).toEqual([1, 2, 3, 4]);
+    expect(sim.addCard(0, start[0])).toEqual([]);
+    expect(sim.addCard(4, start[0])).toContainEqual({ type: 'card', team: 4, id: start[0] });
+    expect(last.cards).toEqual([start[0]]);
+  });
+
   it('cards change the fight (a Golden Parachute saves a knockout once)', () => {
     const sim = new Sim([[def('chef')], [def('builder')]], 1, { cards: [['golden-parachute'], []] });
     const chef = sim.fighters[0];

@@ -5,7 +5,7 @@ import type { FighterDef } from '../sim/types';
  *   HP, Attack, Defense, Attack speed, Move speed, Reach, Accuracy, Evasion, Block, Crit, Weight
  * Profiles are deliberately distinct (tests/attributes.test.ts keeps every pair ≥ 9 points apart),
  * so no two jobs play alike even before their skills. The ratings become real stats in
- * `statsFromRatings`; ATK/HP are then nudged by the auto-balancer (src/data/balance.ts).
+ * `statsFromRatings`. The roster applies its role profiles and per-job balance to these values.
  */
 export const ATTRS = ['HP', 'Attack', 'Defense', 'Attack speed', 'Move speed', 'Reach', 'Accuracy', 'Evasion', 'Block', 'Crit', 'Weight'] as const;
 export type Ratings = [number, number, number, number, number, number, number, number, number, number, number];

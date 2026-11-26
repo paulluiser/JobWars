@@ -28,12 +28,13 @@ export function targetTick(segment: { tick: number; at: number; boundary: number
   return Math.min(segment.boundary, segment.tick + Math.max(0, Math.floor((now - segment.at) * TICK_RATE / 1000 + 1e-8)));
 }
 
-export function roomSimulation(match: { seed: number; mode: PvpMode; lineups: [string[], string[]] | null; log: Pick[] }) {
-  if (!match.lineups) throw new Error('Both teams must lock before combat.');
-  const jobs = (index: 0 | 1) => match.lineups![index].map((id) => byId(id)!);
-  const cards = (index: 0 | 1) => match.log.filter((p) => p.pick === 0 && p.team === index).map((p) => p.id);
-  const opts = PVP_MODES[match.mode].gacha ? gachaOpts([cards(0), cards(1)]) : {};
-  return new Sim([jobs(0), jobs(1)], match.seed, opts);
+export function roomSimulation(match: { seed: number; mode: PvpMode; lineups: string[][] | null; log: Pick[] }) {
+  if (!match.lineups) throw new Error('Fighter lineups must lock before combat.');
+  const jobs = match.lineups.map((lineup) => lineup.map((id) => byId(id)!));
+  const cards = jobs.map((_, side) => match.log.filter((p) => p.pick === 0 && p.team === side).map((p) => p.id));
+  const rules = PVP_MODES[match.mode];
+  const opts = rules.gacha ? gachaOpts(cards) : {};
+  return new Sim(jobs, match.seed, { ...opts, royale: rules.royale });
 }
 
 const traces = new WeakMap<Sim, number>();
@@ -50,12 +51,13 @@ function recordEvents(sim: Sim, events: SimEvent[]) {
   traces.set(sim, hash);
 }
 
-/** Advance exactly to the requested tick, stopping at any draft without both confirmed picks. */
+/** Advance exactly to the requested tick, stopping at any draft without every eligible pick. */
 export function stepRoom(sim: Sim, log: readonly Pick[], target: number, present?: (events: SimEvent[]) => void) {
   while (!sim.over) {
     if (sim.paused) {
       const cards = log.filter((p) => p.pick === sim.surges);
-      if (cards.length !== 2) return;
+      const eligible = sim.livingSides();
+      if (cards.length !== eligible.length || !eligible.every((side) => cards.some((card) => card.team === side))) return;
       for (const card of cards) {
         const events = sim.addCard(card.team, card.id);
         if (events.length) {

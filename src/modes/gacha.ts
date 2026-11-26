@@ -1,12 +1,12 @@
 import { ALL_CARDS, CARD_BY_ID, GACHA, oddsFor, type Card, type Rarity } from '../data/cards';
 import { Rng } from '../sim/rng';
 import { Sim, type SimOpts } from '../sim/sim';
-import type { FighterDef, Team } from '../sim/types';
+import type { BattleSide, FighterDef, Team } from '../sim/types';
 import { GACHA_BALANCE } from '../data/gachaBalance';
 
 /**
  * The Gacha draft: before the fight each side picks 1 of 3 cards, then the fight pauses every
- * 15 s for another pick. Each round rolls one rarity shared by both teams. Online PvP
+ * 15 s for another pick. Each round rolls one rarity shared by all sides. Online PvP
  * generates the choices deterministically, so only the picks travel.
  */
 
@@ -20,7 +20,7 @@ export function poolFor(jobs: FighterDef[]): Card[] {
 }
 
 /** The `offers` cards for a team's pick #`pick` (0 = pre-fight), after `reroll` rerolls. */
-export function offersFor(seed: number, team: Team, pick: number, reroll: number, jobs: FighterDef[], owned: readonly string[]): Card[] {
+export function offersFor(seed: number, team: BattleSide, pick: number, reroll: number, jobs: FighterDef[], owned: readonly string[]): Card[] {
   const [common, rare] = oddsFor(pick);
   const roll = new Rng(mix(seed, pick, 99)).next();
   const rarity: Rarity = roll < common ? 'common' : roll < common + rare ? 'rare' : 'epic';
@@ -44,11 +44,11 @@ export function offersFor(seed: number, team: Team, pick: number, reroll: number
 }
 
 /** The CPU picks at random (as the design asks), but reproducibly from the seed. */
-export function cpuPick(seed: number, team: Team, pick: number, offers: Card[]): Card {
+export function cpuPick(seed: number, team: BattleSide, pick: number, offers: Card[]): Card {
   return offers[Math.floor(new Rng(mix(seed, team, pick, 77)).next() * offers.length)];
 }
 
-export const gachaOpts = (cards: [string[], string[]]): SimOpts => ({
+export const gachaOpts = (cards: readonly (readonly string[])[]): SimOpts => ({
   cards,
   hpMul: GACHA.hpMul,
   timeLimit: GACHA.timeLimit,
@@ -58,7 +58,7 @@ export const gachaOpts = (cards: [string[], string[]]): SimOpts => ({
 });
 
 /** One recorded choice; a match's whole draft is a list of these (replays and share links use it). */
-export interface Pick { team: Team; pick: number; id: string }
+export interface Pick { team: BattleSide; pick: number; id: string }
 
 /**
  * Run a whole Gacha match without rendering: `choose` makes every pick (CPU, tests, balancing).

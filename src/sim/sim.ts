@@ -4,7 +4,7 @@ import { Rng } from './rng';
 import { kitOf } from './kits';
 import {
   DEBUFFS, BUFFS, CC,
-  type Fighter, type FighterDef, type FighterState, type FxKind, type Hazard, type SimEvent, type StatusApply, type StatusKind, type Team,
+  type BattleSide, type Fighter, type FighterDef, type FighterState, type FxKind, type Hazard, type SimEvent, type StatusApply, type StatusKind,
 } from './types';
 import { think } from '../ai/brain';
 import { TAG_BALANCE } from '../data/tagBalance';
@@ -44,6 +44,7 @@ export function forTag(d: FighterDef): FighterDef {
     radius: d.radius * TAG_SCALE,
     range: Math.round(d.range * TAG_REACH),
     atk: Math.round(d.atk * b.atk),
+    skillAtk: d.skillAtk === undefined ? undefined : Math.round(d.skillAtk * b.atk),
     hp: Math.round((d.hp * b.hp) / 10) * 10,
   };
 }
@@ -60,12 +61,14 @@ export function forTag(d: FighterDef): FighterDef {
  */
 /** Match options (Gacha and Story use these; a plain fight needs none). */
 export interface SimOpts {
+  /** Free-for-all with one fighter per side. */
+  royale?: boolean;
   /** cards each team starts with */
-  cards?: [string[], string[]];
+  cards?: readonly (readonly string[])[];
   /** max HP multiplier for everyone (Gacha fights run longer) */
   hpMul?: number;
   /** per-team HP multipliers on top (Story bosses, handicaps) */
-  teamHpMul?: [number, number];
+  teamHpMul?: readonly number[];
   /** seconds before the clock runs out */
   timeLimit?: number;
   /** pause for a card pick every this many seconds (0 = never) */
@@ -73,7 +76,7 @@ export interface SimOpts {
   /** from this second on, damage ramps up (+25% per 10 s) and healing drops to 40% */
   overtimeAt?: number;
   /** each team starts at this fraction of its max HP (Story: sudden death) */
-  startHpPct?: [number, number];
+  startHpPct?: readonly number[];
   /** per-job ATK/HP multipliers for this mode (Gacha has its own balance layer) */
   balance?: Record<string, { atk: number; hp: number }>;
 }
@@ -85,7 +88,7 @@ export class Sim {
   t = 0;
   tick = 0;
   over = false;
-  winner: Team | -1 | null = null;
+  winner: BattleSide | -1 | null = null;
   private events: SimEvent[] = [];
   private timers: { at: number; seq: number; fn: () => void }[] = [];
   private seq = 0;
@@ -118,18 +121,28 @@ export class Sim {
     return (first >>> 0).toString(16).padStart(8, '0') + (second >>> 0).toString(16).padStart(8, '0');
   }
 
-  constructor(teams: [FighterDef[], FighterDef[]], readonly seed: number, readonly opts: SimOpts = {}) {
+  constructor(teams: FighterDef[][], readonly seed: number, readonly opts: SimOpts = {}) {
     this.rng = new Rng(seed);
     this.timeLimit = opts.timeLimit ?? TIME_LIMIT;
     this.surgeEvery = opts.surgeEvery ?? 0;
     this.nextSurge = this.surgeEvery || Infinity;
     // Tag Team has its own balance layer on top of the 1v1 numbers
-    if (teams.some((t) => t.length > 1)) teams = teams.map((t) => t.map(forTag)) as [FighterDef[], FighterDef[]];
+    if (!opts.royale && teams.some((t) => t.length > 1)) teams = teams.map((t) => t.map(forTag));
+    const rotation = opts.royale ? this.rng.range(0, Math.PI * 2) : 0;
+    const participants = teams.filter((defs) => defs.length).length;
+    let spawnIndex = 0;
     teams.forEach((defs, team) => {
+      if (!defs.length) return;
+      const spawnAngle = rotation + (Math.PI * 2 * spawnIndex++) / participants;
       defs.forEach((def, i) => {
-        const x = ARENA_W * (team === 0 ? 0.22 : 0.78) + this.rng.range(-30, 30);
-        const y = ARENA_H * (defs.length === 1 ? 0.5 : 0.3 + i * 0.4) + this.rng.range(-60, 60);
-        const f = this.makeFighter(def, team as Team, x, y);
+        const x = opts.royale
+          ? ARENA_W * (0.5 + 0.3 * dcos(spawnAngle))
+          : ARENA_W * (team === 0 ? 0.22 : 0.78) + this.rng.range(-30, 30);
+        const y = opts.royale
+          ? ARENA_H * (0.5 + 0.3 * dsin(spawnAngle))
+          : ARENA_H * (defs.length === 1 ? 0.5 : 0.3 + i * 0.4) + this.rng.range(-60, 60);
+        const f = this.makeFighter(def, team as BattleSide, x, y);
+        if (opts.royale) f.face = spawnAngle - Math.PI;
         const a = this.rng.range(0, Math.PI * 2);
         f.vx = dcos(a) * def.speed;
         f.vy = dsin(a) * def.speed;
@@ -156,11 +169,13 @@ export class Sim {
     const a = (f.aug = augOf(f.cards));
     const b = f.baseDef;
     const bal = this.opts.balance?.[b.id];
+    const atkMul = bal?.atk ?? 1;
     const hpMul = (this.opts.hpMul ?? 1) * (this.opts.teamHpMul?.[f.team] ?? 1) * a.hpMul * (bal?.hp ?? 1);
     const pct = f.maxHp > 0 ? f.hp / f.maxHp : 1;
     f.def = {
       ...b,
-      atk: b.atk * (bal?.atk ?? 1),
+      atk: b.atk * atkMul,
+      skillAtk: b.skillAtk === undefined ? undefined : b.skillAtk * atkMul,
       hp: Math.round((b.hp * hpMul) / 10) * 10,
       range: b.range * (1 + a.range),
       radius: b.radius * a.sizeMul,
@@ -172,8 +187,8 @@ export class Sim {
   }
 
   /** Give a team a card (draft or surge pick). */
-  addCard(team: Team, id: string) {
-    if (!CARD_BY_ID.has(id)) return [];
+  addCard(team: BattleSide, id: string) {
+    if (!CARD_BY_ID.has(id) || (this.opts.royale && !this.livingSides().includes(team))) return [];
     const eventStart = this.events.length;
     for (const f of this.fighters) {
       if (f.team !== team) continue;
@@ -209,7 +224,7 @@ export class Sim {
     }
   }
 
-  private makeFighter(def: FighterDef, team: Team, x: number, y: number): Fighter {
+  private makeFighter(def: FighterDef, team: BattleSide, x: number, y: number): Fighter {
     return {
       idx: this.fighters.length,
       team,
@@ -250,6 +265,10 @@ export class Sim {
 
   alive(f: Fighter) {
     return f.state !== 'ko';
+  }
+
+  livingSides(): BattleSide[] {
+    return [...new Set(this.fighters.filter((f) => this.alive(f)).map((f) => f.team))];
   }
 
   enemiesOf(f: Fighter) {
@@ -299,14 +318,14 @@ export class Sim {
     return f.statuses.find((s) => s.kind === kind);
   }
 
-  atkOf(f: Fighter) {
+  atkOf(f: Fighter, base = f.def.atk) {
     const a = f.aug;
     let m = (this.has(f, 'spicy') ? 1.2 : 1) * (1 + a.atk + (a.lowHpAtk && f.hp < f.maxHp * 0.5 ? a.lowHpAtk : 0) + Math.min(0.4, (f.augS.grudge ?? 0) * a.grudge));
     const w = this.status(f, 'weaken');
     if (w) m *= 1 - w.value;
     const e = this.status(f, 'empower');
     if (e) m *= 1 + e.value;
-    return f.def.atk * m * (kitOf(f).atkMul?.(this, f) ?? 1);
+    return base * m * (kitOf(f).atkMul?.(this, f) ?? 1);
   }
 
   defOf(f: Fighter) {
@@ -882,7 +901,7 @@ export class Sim {
       return false;
     }
     const def = this.defOf(b) * (1 - (opts.pierce ?? 0));
-    let dmg = this.atkOf(a) * pct * (100 / (100 + def)) * this.rng.range(0.95, 1.05) * (kitOf(b).skillTakenMul?.(this, b, a) ?? 1);
+    let dmg = this.atkOf(a, a.def.skillAtk) * pct * (100 / (100 + def)) * this.rng.range(0.95, 1.05) * (kitOf(b).skillTakenMul?.(this, b, a) ?? 1);
     const crit = opts.canCrit !== false && this.rng.chance(this.critOf(a));
     if (crit) dmg *= C.critMult + a.aug.critDmg;
     dmg *= 1 + a.aug.skillDmg;
@@ -1085,22 +1104,27 @@ export class Sim {
 
   private checkEnd() {
     if (this.over) return;
-    const aliveTeams = new Set(this.fighters.filter((f) => this.alive(f)).map((f) => f.team));
-    if (aliveTeams.size < 2) {
+    const sides = this.livingSides();
+    if (sides.length < 2) {
       this.over = true;
-      this.winner = aliveTeams.size === 1 ? ([...aliveTeams][0] as Team) : -1;
+      this.winner = sides[0] ?? -1;
       this.emit({ type: 'end', winner: this.winner, reason: 'ko' });
       return;
     }
     if (this.t >= this.timeLimit) {
-      const pct = (team: Team) => {
-        const fs = this.fighters.filter((f) => f.team === team);
-        return fs.reduce((s, f) => s + f.hp / f.maxHp, 0) / fs.length;
-      };
-      const p0 = pct(0), p1 = pct(1);
+      let bestHp = -Infinity;
+      let winner: BattleSide | -1 = -1;
+      for (const side of sides) {
+        const fighters = this.fighters.filter((f) => f.team === side);
+        const hp = fighters.reduce((sum, f) => sum + f.hp / f.maxHp, 0) / fighters.length;
+        if (hp > bestHp) {
+          bestHp = hp;
+          winner = side;
+        } else if (hp === bestHp) winner = -1;
+      }
       this.over = true;
-      this.winner = p0 === p1 ? -1 : p0 > p1 ? 0 : 1;
-      this.emit({ type: 'end', winner: this.winner, reason: 'time' });
+      this.winner = winner;
+      this.emit({ type: 'end', winner, reason: 'time' });
     }
   }
 }

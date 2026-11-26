@@ -57,21 +57,51 @@ describe('PvP lobby connection errors', () => {
   });
 
   it('uses the host mode for invite codes even when the guest selected another mode', async () => {
-    const lobby = await PvpSession.createLobby('gacha2', 1000, new AbortController().signal);
-    const hosted = lobby.ready.catch(error => error);
-    const join = PvpSession.joinLobby(lobby.code, 'classic1', 1000);
-    const joined = join.catch(error => error);
+    const signal = new AbortController().signal;
+    const lobby = await PvpSession.createLobby('gacha2', 1000, signal, '  Host  Name ');
+    const hosted = lobby.ready;
+    const joined = PvpSession.joinLobby(lobby.code, 'classic1', 1000, signal, 'Guest');
     await vi.advanceTimersByTimeAsync(0);
     const host = peers[0], guest = peers[1];
+    host.connection.send.mockImplementation((message: Msg) => guest.connection.emit('data', message));
+    guest.connection.send.mockImplementation((message: Msg) => host.connection.emit('data', message));
     host.emit('connection', host.connection);
-    host.connection.emit('open');
     guest.connection.emit('open');
     await vi.advanceTimersByTimeAsync(0);
-    host.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'classic1' });
-    guest.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'gacha2' });
-    expect((await hosted).mode).toBe('gacha2');
-    expect((await joined).mode).toBe('gacha2');
+    host.connection.emit('open');
+    const hostSession = await hosted;
+    const guestSession = await joined;
+    expect(hostSession.mode).toBe('gacha2');
+    expect(guestSession.mode).toBe('gacha2');
+    expect(hostSession.playerNames).toEqual(['Host Name', 'Guest']);
+    expect(guestSession.playerNames).toEqual(['Host Name', 'Guest']);
     expect(guest.connection.send).toHaveBeenCalledWith(expect.objectContaining({ t: 'hello', mode: 'gacha2' }));
+  });
+
+  it('delivers a remote cancellation in order and drops stale picks at rematch', async () => {
+    const join = PvpSession.joinLobby('KC77N', 'classic1', 1000);
+    await vi.advanceTimersByTimeAsync(0);
+    const guest = peers[0];
+    guest.connection.emit('open');
+    await vi.advanceTimersByTimeAsync(0);
+    guest.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'classic1' });
+    const session = await join;
+    const queued: Msg[] = [
+      { t: 'picks', ids: ['chef'] },
+      { t: 'unlock' },
+      { t: 'picks', ids: ['builder'] },
+      { t: 'start', seed: 1, lineups: [['builder'], ['nurse']] },
+    ];
+    for (const message of queued) guest.connection.emit('data', message);
+    const next = () => session.wait((m) => m.t === 'picks' || m.t === 'unlock' || m.t === 'start', 1000);
+    for (const message of queued) expect(await next()).toEqual(message);
+
+    guest.connection.emit('data', { t: 'unlock' });
+    guest.connection.emit('data', { t: 'picks', ids: ['electrician'] });
+    guest.connection.emit('data', { t: 'rematch' });
+    guest.connection.emit('data', { t: 'picks', ids: ['firefighter'] });
+    await session.wait((m) => m.t === 'rematch');
+    expect(await next()).toEqual({ t: 'picks', ids: ['firefighter'] });
   });
 
   it('keeps a matched guest open if another peer lookup fails', async () => {

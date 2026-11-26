@@ -818,3 +818,114 @@ body.portrait { background: var(--bg); }
     animation: none;
   }
 }
+
+.royale-lobby { height: 100%; }
+.royale-desk { display: grid; flex: 1; grid-template-columns: minmax(190px, 1fr) minmax(0, 3fr); }
+.royale-seats, .royale-picks { min-width: 0; padding: var(--desk-gap); }
+.royale-seats { background: var(--desk-inset); }
+.royale-lobby .lobby-code { margin: 0; flex-direction: row; justify-content: space-between; flex-wrap: wrap; gap: 5px; font-size: clamp(12px, 1.3cqw, 16px); }
+.royale-lobby .lobby-code b { font-size: 1.5em; }
+.royale-seats ol { list-style: none; margin: 12px 0 0; padding: 0; }
+.royale-seats li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--desk-line); }
+.royale-seats li span { color: var(--desk-text); }
+.royale-picks { display: flex; flex-direction: column; min-height: 120px; }
+.royale-picks .mini-grid { margin-top: 8px; grid-auto-rows: max-content; }
+.royale-picks .badge .face { flex: none; width: clamp(25px, 4cqw, 50px); height: auto; aspect-ratio: 1; }
+.royale-picks .badge .bname { font-size: clamp(12px, 1.2cqw, 17px); }
+.royale-picks .badge .brole { font-size: clamp(10px, .85cqw, 13px); line-height: 1.1; }
+.royale-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.royale-desk > section { align-self: stretch; }
+
+#royale-hud { position: absolute; inset: 8px 5% auto; display: flex; justify-content: center; gap: 5px; }
+#royale-hud[hidden], body:not(.royale) #royale-hud { display: none; }
+body .royale-banner.banner {
+  position: relative; inset: auto; transform: none; min-width: 0; width: min(17%, 150px);
+  flex-direction: row; align-items: center; gap: 5px; padding: 6px; text-align: left;
+  border-width: 1px; border-radius: 6px; box-shadow: none;
+}
+#royale-hud .local { outline: 2px solid #ffdb72; outline-offset: 1px; }
+#royale-hud .down { opacity: .65; }
+#royale-hud .portrait { width: clamp(20px, 3cqw, 34px); height: auto; aspect-ratio: 1; }
+#royale-hud :is(.tape, .skills-row, .gbar, .chips, .hcards) { display: none; }
+#royale-hud :is(.name, .hpnum) { font-size: clamp(10px, 1.05cqw, 15px); }
+#royale-hud .title { display: block; margin: 0; font: 800 clamp(10px, .85cqw, 12px)/1 var(--ui); }
+#royale-hud .bar { border-width: 1px; height: 5px; }
+#royale-hud .bar .fill { background: var(--team-color); }
+body.royale .clock { top: 62px; }
+body.royale #callout { max-width: 90%; white-space: normal; text-align: center; line-height: 1.05; font-size: clamp(24px, 5.75cqw, 78px); }
+body.royale #seed, body.royale #controls [data-act="share"] { display: none; }
+.dr-owned:not(.rival):last-child { grid-column: 1 / -1; }
+body.royale .card-wide { width: min(95%, 760px); overflow: auto; max-height: 94%; }
+
+body.portrait .royale-desk { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+body.portrait .royale-seats ol { display: flex; gap: 4px; flex-wrap: wrap; }
+body.portrait .royale-seats li { flex: 1 1 54px; flex-direction: column; gap: 2px; text-align: center; font-size: 11px; padding: 2px; }
+body.portrait .royale-picks .mini-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+body.portrait #royale-hud { inset: 6px 3% auto; flex-wrap: wrap; }
+body.portrait .royale-banner.banner { width: 30%; }
+body.portrait #royale-hud .hpnum { display: none; }
+body.portrait #royale-hud .down .title { font-size: 0; }
+body.portrait #royale-hud .down .title::after { content: 'Eliminated'; font-size: 10px; }
+body.portrait.royale .clock { top: 115px; }
+
+.menu > .m-heroes {
+  position: absolute; top: 0; left: 0; min-height: 36px; padding: 5px 12px;
+  font-size: clamp(13px, 1.1cqw, 16px);
+}
+
+#panel.wide:has(> :is(.pvp, .pvp-pick, .royale-lobby, .hero-index, .settings)) {
+  background: #211b17;
+  background-image: radial-gradient(ellipse at top, #483120, #211b17 72%);
+}
+#panel.wide:has(> :is(.pvp, .pvp-pick, .royale-lobby, .hero-index, .settings))::before { content: none; }
+.settings.desk-screen {
+  width: 100%; height: 100%; padding: clamp(12px, 2cqw, 20px); position: relative;
+  isolation: isolate; justify-content: center; align-items: center;
+}
+.settings-backdrop {
+  position: absolute; inset: 0; z-index: -1; border-radius: 14px;
+  background-image: linear-gradient(90deg, #1d1510d9, #26190ba3, #1d1510d9), var(--settings-art, none);
+  background-size: cover; background-position: center;
+}
+.settings .desk-head, .settings .settings-sheet { width: min(100%, 640px); }
+.settings .desk-head { justify-content: flex-start; }
+.settings .settings-sheet { box-shadow: 0 7px 24px #1b100b7a; }
+
+.player-name { display: grid; gap: 4px; font-weight: 800; }
+.player-name input {
+  width: 100%; min-width: 0; min-height: 36px; padding: 5px 9px; border: 1px solid #88725a;
+  border-radius: 5px; font: 800 16px var(--ui); color: var(--ink); background: #fffaf0;
+}
+.player-name input:focus-visible { outline: 2px solid #285c96; outline-offset: 2px; }
+
+.hero-index, .pvp-pick.desk-screen { height: 100%; }
+.hero-picker {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: clamp(7px, 1.1cqw, 16px); padding: clamp(7px, 1.1cqw, 16px);
+}
+.hero-picker .mini-grid { grid-auto-rows: max-content; margin: 0; }
+.hero-picker .badge .face { flex: none; width: clamp(26px, 4cqw, 48px); height: auto; aspect-ratio: 1; }
+.hero-picker .badge .bname { font-size: clamp(12px, 1.2cqw, 17px); }
+.hero-picker .badge .brole { font-size: clamp(10px, .85cqw, 13px); line-height: 1.15; }
+.hero-picker .fighter-profile button { min-height: 30px; }
+.royale-picks.hero-picker { display: grid; min-width: 0; min-height: 0; }
+.royale-seats li b { min-width: 0; overflow-wrap: anywhere; }
+.pick-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px;
+  color: var(--paper); background: #34261c; border: 1px solid #795d43;
+  border-radius: 8px; padding: 6px 10px;
+}
+.pick-status .pp-slots { margin: 0; gap: 4px; flex-wrap: wrap; }
+.pick-status .pslot:not(.empty) { color: var(--ink); }
+.pick-status [role='status'] { margin-left: auto; overflow-wrap: anywhere; }
+.pick-status .spin { display: inline-block; vertical-align: middle; margin-right: 4px; }
+body.portrait .pvp-pick .pick-status [role='status'] { margin-left: 0; }
+body.portrait .hero-picker { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(145px, 1fr) auto; }
+body.portrait .hero-picker .mini-grid { grid-template-columns: repeat(auto-fill, minmax(57px, 1fr)); }
+body.portrait .royale-desk { grid-template-rows: auto minmax(min-content, 1fr); }
+.banner .player-label {
+  display: block; max-width: 100%; margin: 1px 0 0; overflow: hidden; text-overflow: ellipsis;
+  font: 800 clamp(10px, 1.05cqw, 14px)/1.15 var(--ui); white-space: nowrap;
+}
+body.portrait .banner .player-label { display: block; }
+.result-player { font: 800 .9em var(--ui); overflow-wrap: anywhere; }

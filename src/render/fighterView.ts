@@ -6,9 +6,10 @@ import type { Fx } from './fx';
 import type { Juice } from './juice';
 
 const INK = 0x2a1d14;
-export const TEAM_COLORS = [0x3f9cff, 0xff5a46];
+export const TEAM_COLORS = [0x3f9cff, 0xff5a46, 0x48c78e, 0xb68cff, 0xffc84c] as const;
 /** On-screen size multiplier for fighters (sim radius stays the same). */
 export const VIS = 1.15;
+export const ROYALE_FIGHTER_SCALE = 0.78;
 
 /** arm poses (radians from straight up, + = forward) and where the arm passes behind the body */
 const REST = 1.5, WIND = -0.5, STRIKE = 2.25, BEHIND = 0.7;
@@ -270,9 +271,11 @@ export class FighterView {
   private time = 0;
   private dir = 1;
 
-  constructor(readonly f: Fighter, private fx: Fx, private juice: Juice) {
+  readonly visualSize: number;
+
+  constructor(readonly f: Fighter, private fx: Fx, private juice: Juice, scale = 1) {
     const d = f.def;
-    const s = (d.radius / 32) * VIS;
+    const s = this.visualSize = (d.radius / 32) * VIS * scale;
     this.root.addChild(this.shadow, this.castRing, this.ring, this.guardArc, this.glow, this.puppet, this.stars);
     this.castRing.scale.y = 0.34;
     this.castRing.blendMode = 'add';
@@ -287,7 +290,7 @@ export class FighterView {
     this.arm.addChild(this.tipGlow);
     this.puppet.scale.set(s);
     this.ring.ellipse(0, 0, 44 * s, 15 * s).stroke({ width: 4, color: TEAM_COLORS[f.team], alpha: 0.9 });
-    this.dir = f.team === 0 ? 1 : -1;
+    this.dir = Math.cos(f.face) >= 0 ? 1 : -1;
   }
 
   /**
@@ -383,7 +386,7 @@ export class FighterView {
 
   /** Silhouette used for dodge afterimages. */
   silhouette = (g: Graphics) => {
-    const s = (this.f.def.radius / 32) * VIS;
+    const s = this.visualSize;
     g.circle(0, -84 * s, 31 * s).fill(0xffffff).roundRect(-22 * s, -54 * s, 44 * s, 54 * s, 14 * s).fill(0xffffff);
   };
 
@@ -509,11 +512,16 @@ export class FighterView {
 
     // ---- squash & stretch spring ----
     if (!juice.enabled) { tsx = 1; tsy = 1; this.vsx = this.vsy = 0; }
-    this.vsx += ((tsx - this.sx) * 520 - this.vsx * 20) * dt;
-    this.vsy += ((tsy - this.sy) * 520 - this.vsy * 20) * dt;
-    this.sx += this.vsx * dt;
-    this.sy += this.vsy * dt;
-    const s = (f.def.radius / 32) * VIS;
+    // The spring stays stable even when a busy frame takes much longer than 1/60s.
+    const steps = Math.max(1, Math.ceil(dt * 60));
+    const step = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      this.vsx += ((tsx - this.sx) * 520 - this.vsx * 20) * step;
+      this.vsy += ((tsy - this.sy) * 520 - this.vsy * 20) * step;
+      this.sx += this.vsx * step;
+      this.sy += this.vsy * step;
+    }
+    const s = this.visualSize;
 
     // ---- KO ----
     if (st === 'ko') {

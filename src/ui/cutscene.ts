@@ -1,4 +1,4 @@
-import type { FighterDef } from '../sim/types';
+import type { BattleSide, FighterDef } from '../sim/types';
 import { face } from './face';
 
 export type CutsceneMode = 'full' | 'short' | 'off';
@@ -28,7 +28,7 @@ export class Cutscene {
     stage.appendChild(this.el);
   }
 
-  play(def: FighterDef, side: 0 | 1, mode: CutsceneMode) {
+  play(def: FighterDef, side: BattleSide, mode: CutsceneMode) {
     if (mode === 'off') return;
     const main = lum(def.color) > 0.85 ? def.accent : def.color;
     this.el.style.setProperty('--c', hex(main));
@@ -40,7 +40,7 @@ export class Cutscene {
     this.el.querySelector('.cs-kicker')!.textContent = `${def.displayName.toUpperCase()} · ${def.name.toUpperCase()} · SPECIAL MOVE`;
     this.el.className = '';
     void this.el.offsetWidth;
-    this.el.className = `show ${side === 1 ? 'right' : 'left'}`;
+    this.el.className = `show ${side % 2 ? 'right' : 'left'}`;
     clearTimeout(this.timer);
     this.timer = window.setTimeout(() => (this.el.className = ''), CUTSCENE_DUR[mode] * 1000 + 50);
   }

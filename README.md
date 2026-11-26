@@ -108,13 +108,16 @@ converted to MP3 by `tools/sfx/build.ts`. The licence and attribution ship with 
 
 The game opens on a main menu with three modes:
 
-- **Player vs Player**: *PvP Classic (1v1)*, *PvP Gacha (1v1)*, *Tag Team Classic (2v2)* and *Gacha Tag
-  Team (2v2)*. Play by **quick match** (matched by rank first, then widened) or a **5-letter lobby code**.
-  Online play is peer-to-peer over WebRTC (PeerJS, `src/net/pvp.ts`): only the seed, the fighters and the
-  card picks are sent, and both machines simulate the identical fight. The sim's maths is engine-independent
-  (`src/sim/dmath.ts`) so Chrome, Safari and Firefox agree bit for bit; a result hash checks it. **MMR**
-  (Elo, `src/modes/mmr.ts`) with ranks Intern → Associate → Specialist → Manager → Director → Executive → CEO
-  is kept in the browser.
+- **Player vs Player**: Duel (1v1) and Tag Team (2v2) support Classic or Gacha, quick match
+  and 5-character lobby codes. **Battle Royale Classic** and **Battle Royale Gacha** are
+  invite-only and unranked. The host chooses the mode, shares the code, and starts once 3–5
+  connected players lock in one fighter each. The last survivor wins. At the time limit, the
+  greatest remaining HP percentage wins, with exact ties recorded as draws.
+  In Royale Gacha, everyone drafts before the fight. Every 15 seconds of combat the surviving
+  fighters draft again, with one shared rarity and two rerolls each. Eliminated players can
+  watch the rest of the fight. Battle Royale requires the Cloudflare room service.
+  Players simulate combat locally with a shared seed and verify outcomes through the room.
+  Duel and Tag Team ratings are stored in the browser.
 - **Story Mode**: a 24-level career across six Metro City districts (`src/modes/story.ts`). Start with the
   Chef, Firefighter and Nurse and recruit the other 27 jobs by beating them. Every level is a Gacha fight
   with a twist: classic rules, time attack, survival 1-vs-2, bosses with big HP and epic cards, power surges

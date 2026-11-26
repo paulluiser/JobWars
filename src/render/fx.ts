@@ -33,7 +33,7 @@ export class Fx {
   private timed: Timed[] = [];
   private circle: Texture;
   private square: Texture;
-  constructor(renderer: Renderer, readonly under: Container, readonly over: Container) {
+  constructor(renderer: Renderer, readonly under: Container, readonly over: Container, private castLabels = over, private arenaTop = () => -Infinity) {
     this.circle = renderer.generateTexture(new Graphics().circle(16, 16, 16).fill(0xffffff));
     this.square = renderer.generateTexture(new Graphics().rect(0, 0, 16, 16).fill(0xffffff));
   }
@@ -569,31 +569,39 @@ export class Fx {
    * Skill nameplate: a dark pill in the caster's colour that pops above its head and follows it,
    * so you can always tell who cast what. Specials get a gold, bigger plate.
    */
-  castPlate(at: () => { x: number; y: number }, name: string, color: number, special: boolean, tag: string) {
+  castPlate(at: () => { x: number; y: number }, name: string, color: number, special: boolean, caster: string, animate: boolean) {
     const c = new Container();
     const label = new Text({
       text: name.toUpperCase(),
-      style: { fontFamily: FONT, fontSize: special ? 40 : 30, fill: 0xffffff, letterSpacing: 1.5 },
+      style: { fontFamily: FONT, fontSize: special ? 44 : 34, fill: 0xffffff, letterSpacing: 1 },
       resolution: 2,
     });
     label.anchor.set(0.5);
-    const kicker = new Text({ text: tag, style: { fontFamily: FONT, fontSize: 15, fill: special ? 0x2a1d14 : color, letterSpacing: 2 }, resolution: 2 });
+    if (label.width > 265) label.scale.set(265 / label.width);
+    const kicker = new Text({
+      text: `${special ? 'SPECIAL' : 'ACTIVE'} · ${caster}`,
+      style: { fontFamily: FONT, fontSize: 18, fill: special ? 0x211604 : 0xffffff, letterSpacing: 1 },
+      resolution: 2,
+    });
     kicker.anchor.set(0.5);
-    const w = label.width + 36, h = label.height + 14;
+    const w = Math.max(label.width + 38, kicker.width + 40), h = label.height + 16;
     const bg = new Graphics()
-      .roundRect(-w / 2, -h / 2, w, h, h / 2).fill({ color: 0x1d140d, alpha: 0.92 }).stroke({ width: 4, color: special ? 0xffd23f : color })
-      .roundRect(-w / 2 + 6, -h / 2 + 5, w - 12, 6, 3).fill({ color: 0xffffff, alpha: 0.12 });
-    const tab = new Graphics().roundRect(-kicker.width / 2 - 10, -h / 2 - 17, kicker.width + 20, 20, 8).fill(special ? 0xffd23f : 0x1d140d).stroke({ width: 3, color: special ? 0x1d140d : color });
-    kicker.position.set(0, -h / 2 - 7);
+      .roundRect(-w / 2, -h / 2, w, h, 13).fill(0x151515).stroke({ width: 6, color })
+      .poly([-13, h / 2, 13, h / 2, 0, h / 2 + 15]).fill(color);
+    const tab = new Graphics().roundRect(-kicker.width / 2 - 11, -h / 2 - 22, kicker.width + 22, 24, 6)
+      .fill(special ? color : 0x151515).stroke({ width: 3, color });
+    kicker.position.set(0, -h / 2 - 10);
     c.addChild(bg, label, tab, kicker);
-    this.over.addChild(c);
-    const dur = special ? 1.6 : 1.25;
+    if (special) this.castLabels.addChild(c);
+    else this.castLabels.addChildAt(c, 0);
+    const dur = special ? 2.65 : 1.65;
     this.timed.push({ obj: c, life: dur, max: dur, update: (p, o: Container) => {
       const a = at();
-      const pop = p < 0.1 ? 0.4 + (p / 0.1) * 0.75 : p < 0.18 ? 1.15 - ((p - 0.1) / 0.08) * 0.15 : 1;
-      o.position.set(a.x, a.y - 30 - p * 24);
+      const pop = animate ? 1 + 0.14 * Math.max(0, 1 - p * 10) : 1;
+      const lift = (h / 2 + 23) * pop / DEPTH.k;
+      o.position.set(a.x, Math.max(a.y - lift, this.arenaTop() + lift + 6));
       o.scale.set(pop, pop / DEPTH.k);
-      o.alpha = p > 0.78 ? 1 - (p - 0.78) / 0.22 : 1;
+      o.alpha = Math.min(1, (1 - p) * 6);
     } });
   }
 

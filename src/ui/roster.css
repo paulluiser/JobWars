@@ -19,29 +19,29 @@
 .select .badge .bname { font-size: clamp(12px, 1.1vw, 17px); }
 .select .badge .brole { font-size: clamp(10px, .85vw, 13px); }
 .select .badge.focus { outline: 2px solid #ffd23f; outline-offset: 1px; }
-.select .detail { display: grid; align-content: start; align-self: start; min-width: 0; padding: clamp(8px, 1.1vw, 16px); gap: clamp(5px, .8vw, 11px); overflow: visible; border-top-width: 6px; }
-.select .d-head { gap: 9px; }
-.select .d-face { width: clamp(39px, 5vw, 64px); height: auto; aspect-ratio: 1; }
-.select .d-name { font-size: clamp(21px, 2.5vw, 35px); }
-.select .d-identity { display: flex; gap: 7px; align-items: center; margin-top: 2px; font-size: clamp(12px, 1.3vw, 17px); font-weight: 800; }
-.select .d-title { margin-top: 4px; font-size: clamp(11px, 1.05vw, 14px); line-height: 1.22; }
-.select .d-role { background: color-mix(in srgb, var(--rc) 30%, #fff7e7); color: var(--ink); font-size: clamp(10px, 1vw, 13px); padding: 1px 6px; }
-.select .profile-toolbar { display: flex; gap: 5px 9px; align-items: start; justify-content: space-between; flex-wrap: wrap; }
-.select .seg { margin: 0; }
-.select .seg button, .select .skill-tabs button { padding: 4px 7px; font-size: clamp(11px, 1.05vw, 15px); }
-.select .skill-tabs { display: flex; gap: 4px; }
-.select .skill-tabs button { box-shadow: none; text-transform: capitalize; }
-.select .skill-tabs button[aria-pressed="true"] { background: #ffd23f; }
-.select .skill { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 7px; margin: 0; padding: 5px 7px; border-style: solid; border-color: #b4a58b; }
+.fighter-profile.detail { display: grid; align-content: start; align-self: start; min-width: 0; padding: clamp(8px, 1.1vw, 16px); gap: clamp(5px, .8vw, 11px); overflow: visible; border-top-width: 6px; }
+.fighter-profile .d-head { gap: 9px; }
+.fighter-profile .d-face { width: clamp(39px, 5vw, 64px); height: auto; aspect-ratio: 1; }
+.fighter-profile .d-name { font-size: clamp(21px, 2.5vw, 35px); }
+.fighter-profile .d-identity { display: flex; gap: 7px; align-items: center; margin-top: 2px; font-size: clamp(12px, 1.3vw, 17px); font-weight: 800; }
+.fighter-profile .d-title { margin-top: 4px; font-size: clamp(11px, 1.05vw, 14px); line-height: 1.22; }
+.fighter-profile .d-role { background: color-mix(in srgb, var(--rc) 30%, #fff7e7); color: var(--ink); font-size: clamp(10px, 1vw, 13px); padding: 1px 6px; }
+.fighter-profile .profile-toolbar { display: flex; gap: 5px 9px; align-items: start; justify-content: space-between; flex-wrap: wrap; }
+.select .seg, .fighter-profile .seg { margin: 0; }
+.select .seg button, .fighter-profile .seg button, .fighter-profile .skill-tabs button { padding: 4px 7px; font-size: clamp(11px, 1.05vw, 15px); }
+.fighter-profile .skill-tabs { display: flex; gap: 4px; }
+.fighter-profile .skill-tabs button { box-shadow: none; text-transform: capitalize; }
+.fighter-profile .skill-tabs button[aria-pressed="true"] { background: #ffd23f; }
+.fighter-profile .skill { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 7px; margin: 0; padding: 5px 7px; border-style: solid; border-color: #b4a58b; }
 .skill-icon { display: block; object-fit: cover; border: 1px solid var(--ink); border-radius: 5px; vertical-align: middle; }
-.select .skill-icon { width: clamp(31px, 3.5vw, 51px); height: auto; aspect-ratio: 1; }
-.select .skill-tag { font-size: clamp(9px, .85vw, 12px); line-height: 1.15; text-transform: capitalize; letter-spacing: 0; opacity: .8; }
-.select .skill-name { font-size: clamp(13px, 1.4vw, 21px); line-height: 1.1; }
-.select .skill p, .select .skill .quote, .select .d-quirk { font-size: clamp(11px, 1.08vw, 15px); line-height: 1.2; margin: 2px 0 0; }
-.select .stats { gap: 4px 9px; margin: 5px 0; }
-.select .stat { grid-template-columns: minmax(46px, 1.4fr) minmax(10px,.8fr) minmax(28px,.62fr); gap: 3px; font-size: clamp(10px,.95vw,14px); }
-.select .sig { margin: 0; }
-.select .sig span { font-size: clamp(10px,.9vw,13px); }
+.fighter-profile .skill-icon { width: clamp(31px, 3.5vw, 51px); height: auto; aspect-ratio: 1; }
+.fighter-profile .skill-tag { font-size: clamp(9px, .85vw, 12px); line-height: 1.15; text-transform: capitalize; letter-spacing: 0; opacity: .8; }
+.fighter-profile .skill-name { font-size: clamp(13px, 1.4vw, 21px); line-height: 1.1; }
+.fighter-profile .skill p, .fighter-profile .skill .quote, .fighter-profile .d-quirk { font-size: clamp(11px, 1.08vw, 15px); line-height: 1.2; margin: 2px 0 0; }
+.fighter-profile .stats { gap: 4px 9px; margin: 5px 0; }
+.fighter-profile .stat { grid-template-columns: minmax(46px, 1.4fr) minmax(10px,.8fr) minmax(28px,.62fr); gap: 3px; font-size: clamp(10px,.95vw,14px); }
+.fighter-profile .sig { margin: 0; }
+.fighter-profile .sig span { font-size: clamp(10px,.9vw,13px); }
 .select .roster-footer { margin-top: auto; }
 .select .sel-foot { justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; background: #201a14; border: 1px solid #65513c; border-radius: 10px; padding: 5px 8px; }
 .select .setup-tools, .select .setup-start { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; }

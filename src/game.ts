@@ -3,18 +3,18 @@ import { ROSTER, byId } from './data/roster';
 import { DEFAULT_ARENA, isArenaId, resolveArena, storyArena, type ArenaChoice } from './data/arenas';
 import { ARENA_H, ARENA_W, DT } from './sim/constants';
 import { Sim, type SimOpts } from './sim/sim';
-import type { FighterDef, SimEvent, Team } from './sim/types';
+import type { BattleSide, FighterDef, SimEvent, Team } from './sim/types';
 import { CARD_BY_ID, GACHA, type Card } from './data/cards';
 import { cpuPick, gachaOpts, offersFor, type Pick } from './modes/gacha';
 import { DraftOverlay, buffPanelHtml } from './ui/cards';
-import { renderLevel, renderMenu, renderPvp, renderPvpPick, renderStoryMap, storyResultHtml, type PvpView } from './ui/menu';
+import { renderHeroLibrary, renderLevel, renderMenu, renderPvp, renderPvpPick, renderRoyaleLobby, renderStoryMap, storyResultHtml, type HeroPreview, type PvpView } from './ui/menu';
 import { PVP_MODES, PvpSession, type Msg, type PvpMode } from './net/pvp';
 import { clearSavedRoom, RoomClient, roomService, savedRoom } from './net/roomClient';
 import { roomCheckpoint, roomSimulation, stepRoom, SURGE_TICKS, targetTick } from './net/roomSim';
-import type { RoomView } from './net/roomWire';
+import { normalizeDisplayName, type RoomView } from './net/roomWire';
 import { loadProfile, recordResult, tierOf } from './modes/mmr';
 import { LEVELS, isOpen, judge, loadProgress, saveProgress, type Level } from './modes/story';
-import { TEAM_COLORS, VIS, castColor } from './render/fighterView';
+import { TEAM_COLORS, castColor } from './render/fighterView';
 import { loadArt, posterUrl } from './render/art';
 import { DEPTH } from './render/depth';
 import { Juice } from './render/juice';
@@ -40,7 +40,8 @@ export interface MatchSpec {
   gacha: boolean;
   control: [Side, Side];
   arena?: ArenaChoice;
-  names?: [string, string];
+  names?: string[];
+  localSide?: BattleSide;
   /** extra sim options (Story: boss HP, time limits, enemy's starting cards) */
   extra?: Partial<SimOpts>;
   /** cards a side starts with on top of its draft (Story) */
@@ -63,6 +64,8 @@ export interface MatchSpec {
 }
 
 const ROOM_RESULTS = '<button class="primary" data-act="pvprematch">Rematch</button><button data-act="share">Share this fight</button><button data-act="pvpleave">Leave</button>';
+const DISPLAY_NAME_KEY = 'pvpDisplayName';
+const ROYALE_RESULTS = '<button class="primary" data-act="pvprematch">Rematch</button><button data-act="pvpleave">Leave</button>';
 interface RoomRun {
   match: number;
   draft: number;
@@ -184,18 +187,20 @@ export class Game {
     return Math.floor(Math.random() * 99999) + 1;
   }
 
-  newFight(seed: number) {
+  newFight(seed: number, simulation?: Sim) {
     this.seed = seed;
     // team 0 = blue (left / top-left), team 1 = red; the picks are split down the middle
     const h = this.blueCount;
-    this.sim = new Sim([this.picks.slice(0, h), this.picks.slice(h)], seed, this.simOpts());
+    this.sim = simulation ?? new Sim([this.picks.slice(0, h), this.picks.slice(h)], seed, this.simOpts());
+    const royale = !!this.sim.opts.royale;
     this.ended = false;
-    document.body.classList.toggle('tag', this.picks.length > 2);
+    document.body.classList.toggle('tag', !royale && this.picks.length > 2);
+    document.body.classList.toggle('royale', royale);
     document.body.classList.toggle('gacha', this.spec.gacha);
     this.hideBuffs();
-    this.scene.setArena(resolveArena(this.spec.arena, this.picks.map((d) => d.id), seed));
+    this.scene.setArena(resolveArena(this.spec.arena, this.sim.fighters.map((f) => f.def.id), seed));
     this.scene.setFighters(this.sim);
-    this.hud.setup(this.sim, TEAM_HEX);
+    this.hud.setup(this.sim, TEAM_HEX, this.spec.localSide, this.spec.kind === 'pvp' ? this.spec.names : undefined);
     this.acc = 0;
     this.endT = -1;
     this.cutT = 0;
@@ -212,6 +217,7 @@ export class Game {
     this.replayed = false;
     this.ko = null;
     this.lastTick = -1;
+    this.heartT = 0;
     this.scene.focus = null;
     this.firstBlood = false;
     this.lastHitBy = {};
@@ -221,7 +227,8 @@ export class Game {
       const label = this.spec.names ? `${this.spec.names[0]} vs ${this.spec.names[1]}`.toUpperCase()
         : this.match && this.tourney ? roundName(this.tourney, this.match.r).toUpperCase()
         : `${this.spec.gacha ? 'GACHA · ' : ''}${this.picks.length > 2 ? 'TAG TEAM' : `SEED ${seed}`}`;
-      this.intro.play(this.picks.slice(0, h), this.picks.slice(h), label);
+      if (royale) this.hud.callout('BATTLE ROYALE');
+      else this.intro.play(this.picks.slice(0, h), this.picks.slice(h), label);
       this.introT = INTRO_DUR;
       this.sfx.mood('off');
       this.sfx.jingle('intro');
@@ -262,6 +269,7 @@ export class Game {
   }
 
   async share(btn?: HTMLElement | null) {
+    if (this.sim.opts.royale) return;
     const url = this.shareUrl();
     try {
       if (navigator.share && matchMedia('(pointer: coarse)').matches) await navigator.share({ title: 'Job Wars', url });
@@ -324,10 +332,30 @@ export class Game {
 
   /** Leave the current match (any screen change): close the draft, buff panel and timers. */
   private leaveMatch() {
+    const hadFight = this.started || this.endT >= 0 || this.replaying;
     this.started = false;
     this.drafting = false;
     this.draft?.cancel();
     this.hideBuffs();
+    this.paused = false;
+    this.replaying = false;
+    this.introT = 0;
+    this.intro?.stop();
+    this.cutT = 0;
+    this.cutscene?.stop();
+    this.pending = [];
+    this.endT = -1;
+    this.sfx.stopAll();
+    this.juice.hitstop = 0;
+    this.juice.slowmoT = 0;
+    this.juice.trauma = 0;
+    document.body.classList.remove('royale', 'replaying', 'drafting');
+    if (hadFight) {
+      this.sim = new Sim([[ROSTER[7]], [ROSTER[16]]], 1);
+      this.scene.setArena(DEFAULT_ARENA);
+      this.scene.setFighters(this.sim);
+      this.hud.setup(this.sim, TEAM_HEX);
+    }
   }
 
   showSelect() {
@@ -343,7 +371,6 @@ export class Game {
     this.sfx.stopAll();
     this.sfx.mood('menu');
     this.cutscene?.stop();
-    if (this.select.mode !== 'tourney') this.select.picks = this.picks;
     renderSelect(this.panel, this.select, (r) => this.go(r), (m) => {
       this.mode = m;
       try { localStorage.setItem('mode', m); } catch {}
@@ -398,6 +425,10 @@ export class Game {
     renderMenu(this.panel, loadProfile(), loadProgress(), (where) => {
       if (where === 'cpu') this.showSelect();
       else if (where === 'pvp') this.showPvp();
+      else if (where === 'heroes') renderHeroLibrary(this.panel, this.select.detailed, () => {
+        this.showMenu();
+        this.panel.querySelector<HTMLButtonElement>('.m-heroes')?.focus();
+      });
       else this.showStory();
     });
   }
@@ -411,9 +442,10 @@ export class Game {
   }
 
   // ---------------- PvP ----------------
-  private pvp: { view: PvpView; abort: AbortController | null; session: PvpSession | null; picks: FighterDef[]; ready: boolean; oppReady: boolean; oppPicks: string[] | null; inMatch: boolean } = {
-    view: { mode: 'classic1', profile: loadProfile(), status: '', code: '', busy: false, error: '' },
+  private pvp: { view: PvpView; abort: AbortController | null; session: PvpSession | null; picks: FighterDef[]; ready: boolean; oppReady: boolean; oppPicks: string[] | null; inMatch: boolean; preview: HeroPreview; pickListen?: AbortController } = {
+    view: { mode: 'classic1', playerName: '', profile: loadProfile(), status: '', code: '', busy: false, error: '' },
     abort: null, session: null, picks: [], ready: false, oppReady: false, oppPicks: null, inMatch: false,
+    preview: { skill: 'passive', detailed: false },
   };
 
   private roomLink: RoomClient | null = null;
@@ -430,6 +462,8 @@ export class Game {
     this.sfx.mood('menu');
     const P = this.pvp;
     try { const m = localStorage.getItem('pvpMode') as PvpMode | null; if (m && m in PVP_MODES && !P.view.busy) P.view.mode = m; } catch {}
+    try { P.view.playerName = localStorage.getItem(DISPLAY_NAME_KEY) ?? ''; } catch {}
+    if (!roomService && PVP_MODES[P.view.mode].royale) P.view.mode = 'classic1';
     P.view.profile = loadProfile();
     if (error) P.view.error = error;
     const draw = () => renderPvp(this.panel, P.view, (a, v) => void this.pvpAct(a, v, draw), !!roomService);
@@ -440,6 +474,15 @@ export class Game {
   private async pvpAct(a: string, v: string | undefined, draw: () => void) {
     const P = this.pvp, V = P.view;
     switch (a) {
+      case 'playername': {
+        V.playerName = v ?? '';
+        const name = normalizeDisplayName(V.playerName);
+        try {
+          if (name) localStorage.setItem(DISPLAY_NAME_KEY, name);
+          else localStorage.removeItem(DISPLAY_NAME_KEY);
+        } catch {}
+        return;
+      }
       case 'back':
         this.pvpEnd();
         return this.showMenu();
@@ -458,7 +501,15 @@ export class Game {
       case 'host':
       case 'join':
       case 'resume': {
-        if (V.busy) return;
+        if (V.busy || (a === 'quick' && PVP_MODES[V.mode].royale)) return;
+        const displayName = normalizeDisplayName(V.playerName);
+        if (a !== 'resume' && !displayName) {
+          V.error = 'Enter a valid display name (1–24 characters).';
+          draw();
+          this.panel.querySelector<HTMLInputElement>('#playername')?.focus();
+          return;
+        }
+        if (displayName) V.playerName = displayName;
         const code = (v ?? '').trim().toUpperCase();
         if (a === 'join' && !/^[A-Z0-9]{5}$/.test(code)) {
           V.error = 'Lobby codes are 5 characters.';
@@ -480,7 +531,7 @@ export class Game {
         try {
           if (roomService) {
             const destination = a === 'resume' ? savedRoom() : {
-              mode, mmr,
+              mode, mmr, displayName: displayName ?? undefined,
               code: a === 'join' ? code : undefined,
               tier: a === 'quick' ? tierOf(mmr) : undefined,
             };
@@ -489,14 +540,19 @@ export class Game {
             const room = await RoomClient.open(destination, attempt.signal, status);
             if (!active()) return room.close();
             P.abort = null;
+            V.status = '';
             this.roomLink = room;
             room.onState = (view) => this.applyRoom(view, draw);
             room.onStatus = (notice) => {
               if (this.roomLink !== room) return;
               if (notice) this.hud.callout(notice, '#ffb02e');
               if (room.view.phase === 'waiting') {
-                V.status = notice || 'Share the code. Waiting for your opponent…';
-                draw();
+                V.status = notice;
+                if (PVP_MODES[room.view.mode].royale) this.showRoyaleLobby(room, room.view);
+                else {
+                  V.status ||= 'Share the code. Waiting for your opponent…';
+                  draw();
+                }
               }
               if (notice.startsWith('Could not reconnect') || notice.startsWith('This lobby was opened')) {
                 room.close(false);
@@ -504,6 +560,8 @@ export class Game {
                 this.roomRun = null;
                 this.roomRound = 0;
                 V.busy = false;
+                V.code = '';
+                V.status = '';
                 this.showPvp(notice);
               }
             };
@@ -513,10 +571,10 @@ export class Game {
           let session: PvpSession;
           if (a === 'quick') {
             status('Connecting…');
-            session = await PvpSession.quickMatch(mode, mmr, tierOf(mmr), attempt.signal, status);
+            session = await PvpSession.quickMatch(mode, mmr, tierOf(mmr), attempt.signal, status, displayName ?? undefined);
           } else if (a === 'host') {
             status('Creating a lobby…');
-            const lobby = await PvpSession.createLobby(mode, mmr, attempt.signal);
+            const lobby = await PvpSession.createLobby(mode, mmr, attempt.signal, displayName ?? undefined);
             if (active()) {
               V.code = lobby.code;
               status('Share the code. Waiting for your opponent…');
@@ -524,7 +582,7 @@ export class Game {
             session = await lobby.ready;
           } else {
             status(`Joining ${code}…`);
-            session = await PvpSession.joinLobby(code, mode, mmr, attempt.signal);
+            session = await PvpSession.joinLobby(code, mode, mmr, attempt.signal, displayName ?? undefined);
           }
           if (!active()) return session.close();
           P.abort = null;
@@ -560,6 +618,17 @@ export class Game {
       return;
     }
     if (view.phase === 'waiting') {
+      if (PVP_MODES[view.mode].royale) {
+        if (this.roomRound !== view.match) {
+          this.roomRound = view.match;
+          this.roomRun = null;
+          this.leaveMatch();
+          P.picks = [];
+          P.preview = { skill: 'passive', detailed: this.cardDetails };
+        }
+        this.showRoyaleLobby(room, view);
+        return;
+      }
       P.view.busy = true;
       P.view.code = room.code;
       P.view.status = 'Share the code. Waiting for your opponent…';
@@ -574,27 +643,33 @@ export class Game {
       this.roomRun = null;
       this.leaveMatch();
       P.picks = [];
+      P.preview = { skill: 'passive', detailed: this.cardDetails };
       P.ready = false;
     }
     if (view.phase === 'picks') {
       const need = PVP_MODES[view.mode].tag ? 2 : 1;
       const rival = (1 - view.team) as Team;
+      const locked = view.ready[view.team];
+      if (locked) {
+        P.picks = view.mine.map((id) => byId(id)!);
+        P.preview.fighter ??= P.picks[0];
+      }
       document.body.classList.add('selecting');
       document.body.classList.remove('pvp', 'drafting');
       const render = () => renderPvpPick(this.panel, {
-        mode: view.mode, need, picks: view.ready[view.team] ? view.mine.map((id) => byId(id)!) : P.picks,
-        ready: P.ready || view.ready[view.team], oppReady: view.ready[rival], oppMmr: view.rivalMmr, myMmr: loadProfile().mmr,
+        mode: view.mode, need, picks: P.picks, ready: locked, oppReady: view.ready[rival],
+        myName: view.playerNames[view.team], oppName: view.playerNames[rival], preview: P.preview,
       }, (action, id) => {
         if (action === 'leave') return this.pvpLeave();
-        if (P.ready || view.ready[view.team]) return;
+        if (action === 'unlock' && locked) return room.unlock();
+        if (locked) return;
         if (action === 'pick' && id) {
           const job = byId(id)!;
+          P.preview.fighter = job;
           P.picks = P.picks.includes(job) ? P.picks.filter((pick) => pick !== job) : [...P.picks, job].slice(-need);
           render();
         } else if (action === 'ready' && P.picks.length === need) {
-          P.ready = true;
           room.send({ t: 'lock', match: view.match, ids: P.picks.map((job) => job.id) });
-          render();
         }
       });
       render();
@@ -612,18 +687,19 @@ export class Game {
       return;
     }
     if (!run.fightBuilt) {
+      const royale = !!PVP_MODES[view.mode].royale;
       this.sfx.init();
-      this.picks = view.lineups.flat().map((id) => byId(id)!);
+      if (!royale) this.picks = view.lineups.flat().map((id) => byId(id)!);
       this.tourney = null;
       this.match = null;
       this.spec = {
         kind: 'pvp', arena: view.arena, gacha: PVP_MODES[view.mode].gacha,
-        control: ['remote', 'remote'], names: view.team === 0 ? ['You', 'Rival'] : ['Rival', 'You'],
-        resultActions: ROOM_RESULTS,
+        control: ['remote', 'remote'], names: view.playerNames, localSide: view.team,
+        resultActions: royale ? ROYALE_RESULTS : ROOM_RESULTS,
       };
       this.draftLog = view.log;
       this.started = true;
-      this.newFight(view.seed);
+      this.newFight(view.seed, royale ? roomSimulation(view) : undefined);
       document.body.classList.add('pvp');
       run.fightBuilt = true;
     }
@@ -634,6 +710,15 @@ export class Game {
     }
     if (view.phase === 'result' && view.result) {
       if (!run.shownResult) this.showRoomResult(view, run);
+      if (view.occupied && view.occupied.filter(Boolean).length < 3) {
+        const rematch = this.panel.querySelector<HTMLButtonElement>('[data-act="pvprematch"]');
+        if (rematch) {
+          rematch.disabled = true;
+          rematch.title = 'At least three players are needed for a rematch.';
+        }
+        const status = this.panel.querySelector('[data-rematch-status]');
+        if (status) status.textContent = 'At least three players are needed for a rematch.';
+      }
       return;
     }
     if (view.repair && run.repair !== view.repair.hash) {
@@ -645,7 +730,7 @@ export class Game {
       if (roomCheckpoint(repaired) === view.repair.hash) {
         this.sim = repaired;
         this.scene.setFighters(repaired);
-        this.hud.setup(repaired, TEAM_HEX);
+        this.hud.setup(repaired, TEAM_HEX, view.team, view.playerNames);
         this.hud.callout('Fight resynchronized');
       } else {
         run.blocked = true;
@@ -655,21 +740,61 @@ export class Game {
     if (view.phase === 'draft') this.showRoomDraft(room, view, run);
   }
 
+  private showRoyaleLobby(room: RoomClient, view: RoomView) {
+    const P = this.pvp;
+    P.view.busy = true;
+    P.view.code = room.code;
+    document.body.classList.add('selecting');
+    document.body.classList.remove('pvp', 'drafting', 'royale');
+    if (view.mine[0]) {
+      P.picks = [byId(view.mine[0])!];
+      P.preview.fighter ??= P.picks[0];
+    }
+    const draw = () => renderRoyaleLobby(this.panel, view, room.code, P.picks[0], P.view.status, P.preview, (action, id) => {
+      if (action === 'leave') return this.pvpLeave();
+      if (action === 'copycode') {
+        void navigator.clipboard.writeText(room.code).catch(() => {});
+      } else if (action === 'pick' && id && !view.ready[view.team]) {
+        const fighter = byId(id);
+        if (fighter) { P.picks = [fighter]; P.preview.fighter = fighter; draw(); }
+      } else if (action === 'ready' && P.picks[0]) {
+        room.send({ t: 'lock', match: view.match, ids: [P.picks[0].id] });
+      } else if (action === 'unlock') {
+        room.unlock();
+      } else if (action === 'start') {
+        room.send({ t: 'start', match: view.match });
+      }
+    });
+    draw();
+  }
+
   private showRoomDraft(room: RoomClient, view: RoomView, run: RoomRun) {
-    if (view.chosen || run.draft === view.pick) return;
+    if (run.draft === view.pick) return;
     run.draft = view.pick;
+    this.hideBuffs();
+    if (view.eligible && !view.eligible.includes(view.team)) {
+      this.hud.callout('SURVIVORS ARE DRAFTING');
+      return;
+    }
+    if (view.chosen) {
+      document.body.classList.remove('drafting');
+      this.hud.callout('WAITING FOR OTHER PICKS');
+      return;
+    }
     document.body.classList.add('drafting');
     const team = view.team;
     const fighters = view.lineups![team].map((id) => byId(id)!);
-    const owned = (side: Team) => view.log.filter((p) => p.team === side).map((p) => p.id);
+    const owned = (side: BattleSide) => view.log.filter((p) => p.team === side).map((p) => p.id);
     let reroll = view.rerolls;
     const offers = () => offersFor(view.seed, team, view.pick, reroll, fighters, owned(team));
     void this.draft.pick({
       title: view.pick === 0 ? 'Choose your first card' : `Card pick ${view.pick + 1}`,
-      subtitle: 'Both players resume together after the draft.',
+      subtitle: PVP_MODES[view.mode].royale ? 'The fight resumes when all survivors are ready.' : 'Both players resume together after the draft.',
       offers: offers(), rerollsLeft: GACHA.rerolls - reroll,
       timer: Math.max(1, Math.ceil((view.at - room.clock()) / 1000)), serverDeadline: true,
-      detailed: this.select.detailed, team: fighters, owned: owned(team), rivalOwned: owned((1 - team) as Team), rivalName: 'Rival',
+      detailed: this.select.detailed, team: fighters, owned: owned(team),
+      rivalOwned: PVP_MODES[view.mode].royale ? [] : owned((1 - team) as Team),
+      rivalName: PVP_MODES[view.mode].royale ? '' : view.playerNames[1 - team],
     }, () => {
       reroll++;
       room.send({ t: 'reroll', match: view.match, pick: view.pick, reroll });
@@ -677,6 +802,10 @@ export class Game {
     }).then((card) => {
       if (this.roomLink === room && room.view.match === view.match && room.view.phase === 'draft' && room.view.pick === view.pick) {
         room.send({ t: 'card', match: view.match, pick: view.pick, reroll, id: card.id });
+        if (PVP_MODES[view.mode].royale) {
+          document.body.classList.remove('drafting');
+          this.hud.callout('WAITING FOR OTHER PICKS');
+        }
       }
     });
   }
@@ -691,18 +820,22 @@ export class Game {
       this.sim = roomSimulation(view);
       stepRoom(this.sim, view.log, result.tick);
       this.scene.setFighters(this.sim);
-      this.hud.setup(this.sim, TEAM_HEX);
+      this.hud.setup(this.sim, TEAM_HEX, this.spec.localSide, this.spec.kind === 'pvp' ? this.spec.names : undefined);
     }
     const confirmed = this.sim.over && roomCheckpoint(this.sim) === result.hash;
+    const royale = !!PVP_MODES[view.mode].royale;
+    const actions = royale ? ROYALE_RESULTS : ROOM_RESULTS;
     if (confirmed) {
-      renderResults(this.panel, this.sim, TEAM_HEX, { actions: ROOM_RESULTS, names: this.spec.names });
+      renderResults(this.panel, this.sim, TEAM_HEX, { actions, names: this.spec.names, localSide: view.team });
     } else {
-      const label = result.winner === -1 ? 'Draw' : result.winner === view.team ? 'You won' : 'Your rival won';
+      const label = result.winner === -1 ? 'Draw' : result.winner === view.team ? 'You won' : `${view.playerNames[result.winner]} won`;
       this.panel.onclick = null;
       this.panel.classList.remove('wide');
-      this.panel.innerHTML = `<div class="card"><h1>${label}</h1><p>Result confirmed by the room.</p><div class="actions">${ROOM_RESULTS}</div></div>`;
+      this.panel.innerHTML = `<div class="card"><h1></h1><p>Result confirmed by the room.</p><div class="actions">${actions}</div></div>`;
+      this.panel.querySelector('h1')!.textContent = label;
       this.panel.classList.add('show');
     }
+    if (royale) return; // invite-only free-for-all is unranked
     const key = `jobwars-room-result-${this.roomLink?.code}-${view.seed}`;
     try {
       if (sessionStorage.getItem(key)) return;
@@ -719,8 +852,10 @@ export class Game {
     const current = room.clock();
     if (view.phase === 'fight' && current < view.at) return 0;
     if (this.introT > 0) {
-      this.introT = 0;
-      this.beginFight();
+      if (view.phase === 'fight') {
+        this.introT = 0;
+        this.beginFight();
+      } else this.intro.stop();
     }
     const target = view.phase === 'draft' ? view.tick : targetTick(view, current);
     const before = this.sim.tick;
@@ -748,6 +883,7 @@ export class Game {
     sess.onClose = () => {
       if (P.session !== sess) return;
       P.session = null;
+      P.pickListen?.abort();
       if (P.inMatch && this.started && !this.sim.over) this.hud.callout('OPPONENT LEFT', '#ffb02e');
       else this.showPvp('Your opponent left.');
     };
@@ -762,45 +898,62 @@ export class Game {
     this.leaveMatch();
     P.inMatch = false;
     P.picks = [];
+    P.preview = { skill: 'passive', detailed: this.cardDetails };
     P.ready = false;
     P.oppReady = false;
     P.oppPicks = null;
+    P.pickListen?.abort();
+    const listener = P.pickListen = new AbortController();
     document.body.classList.add('selecting');
-    const mode = PVP_MODES[sess.mode];
-    const need = mode.tag ? 2 : 1;
-    const draw = () => renderPvpPick(this.panel, { need, picks: P.picks, oppReady: P.oppReady, ready: P.ready, oppMmr: sess.oppMmr, myMmr: loadProfile().mmr, mode: sess.mode }, (a, id) => {
-      if (a === 'leave') {
-        this.pvpEnd();
-        return this.showPvp();
-      }
-      if (a === 'pick' && id && !P.ready) {
-        const d = byId(id)!;
-        P.picks = P.picks.includes(d) ? P.picks.filter((x) => x !== d) : [...P.picks, d].slice(-need);
-        return draw();
-      }
-      if (a === 'ready' && P.picks.length === need) {
+    const need = PVP_MODES[sess.mode].tag ? 2 : 1;
+    const draw = () => renderPvpPick(this.panel, {
+      need, picks: P.picks, oppReady: P.oppReady, ready: P.ready, mode: sess.mode,
+      myName: sess.playerName, oppName: sess.oppName, preview: P.preview,
+    }, (action, id) => {
+      if (action === 'leave') return this.pvpLeave();
+      if (action === 'pick' && id && !P.ready) {
+        const fighter = byId(id)!;
+        P.preview.fighter = fighter;
+        P.picks = P.picks.includes(fighter) ? P.picks.filter((pick) => pick !== fighter) : [...P.picks, fighter].slice(-need);
+      } else if (action === 'ready' && !P.ready && P.picks.length === need) {
         P.ready = true;
         sess.send({ t: 'picks', ids: P.picks.map((d) => d.id) });
-        draw();
-        void maybeStart();
+      } else if (action === 'unlock' && P.ready) {
+        P.ready = false;
+        sess.send({ t: 'unlock' });
       }
+      draw();
+      maybeStart();
     });
-    const maybeStart = async () => {
-      if (!P.ready || !P.oppPicks || P.inMatch) return;
+    const start = (seed: number, lineups: [string[], string[]]) => {
+      const me = sess.host ? 0 : 1;
+      P.picks = lineups[me].map((id) => byId(id)!);
+      P.oppPicks = lineups[1 - me];
       P.inMatch = true;
-      let seed: number;
-      if (sess.host) {
-        seed = this.randomSeed();
-        sess.send({ t: 'start', seed });
-      } else seed = (await sess.wait((m): m is Extract<Msg, { t: 'start' }> => m.t === 'start')).seed;
-      if (P.session === sess) this.pvpBegin(seed);
+      listener.abort();
+      this.pvpBegin(seed);
     };
-    void sess.wait((m): m is Extract<Msg, { t: 'picks' }> => m.t === 'picks').then((m) => {
-      if (P.session !== sess) return;
-      P.oppPicks = m.ids;
-      P.oppReady = true;
-      if (!P.inMatch) draw();
-      void maybeStart();
+    const maybeStart = () => {
+      if (!sess.host || !P.ready || !P.oppPicks || P.inMatch) return;
+      const seed = this.randomSeed();
+      const lineups: [string[], string[]] = [P.picks.map((d) => d.id), P.oppPicks];
+      sess.send({ t: 'start', seed, lineups });
+      start(seed, lineups);
+    };
+    const listen = async () => {
+      while (P.session === sess && !listener.signal.aborted) {
+        const message = await sess.wait((m): m is Extract<Msg, { t: 'picks' | 'unlock' | 'start' }> =>
+          m.t === 'picks' || m.t === 'unlock' || (!sess.host && m.t === 'start'), 0, listener.signal);
+        if (P.session !== sess || listener.signal.aborted) return;
+        if (message.t === 'start') return start(message.seed, message.lineups);
+        P.oppPicks = message.t === 'picks' ? message.ids : null;
+        P.oppReady = !!P.oppPicks;
+        draw();
+        maybeStart();
+      }
+    };
+    void listen().catch(() => {
+      if (!listener.signal.aborted && P.session === sess) this.pvpLeave();
     });
     draw();
   }
@@ -817,7 +970,8 @@ export class Game {
       arena: 'auto',
       gacha: PVP_MODES[sess.mode].gacha,
       control: me === 0 ? ['human', 'remote'] : ['remote', 'human'],
-      names: me === 0 ? ['You', 'Rival'] : ['Rival', 'You'],
+      names: sess.playerNames,
+      localSide: me,
       remote: {
         // the rival's pick arrives over the network; if they drop, the CPU picks for them
         pick: (t, n, offers) => Promise.race([
@@ -841,7 +995,7 @@ export class Game {
     let winner = sim.winner;
     let note = '';
     if (sess) {
-      sess.send({ t: 'result', winner: sim.winner ?? -1, hash });
+      sess.send({ t: 'result', winner: sim.winner === 0 || sim.winner === 1 ? sim.winner : -1, hash });
       const theirs = await sess.wait((m): m is Extract<Msg, { t: 'result' }> => m.t === 'result', 6000).catch(() => null);
       if (theirs && theirs.hash !== hash) {
         // should never happen (deterministic sim); the host's result is the official one
@@ -858,7 +1012,8 @@ export class Game {
   pvpRematch() {
     if (this.roomLink) {
       this.roomLink.send({ t: 'rematch', match: this.roomLink.view.match });
-      this.panel.innerHTML = '<div class="card"><h1>Rematch?</h1><p>Waiting for your opponent…</p><div class="actions"><button data-act="pvpleave">Leave</button></div></div>';
+      const waiting = PVP_MODES[this.roomLink.view.mode].royale ? 'Waiting for the other players…' : 'Waiting for your opponent…';
+      this.panel.innerHTML = `<div class="card"><h1>Rematch?</h1><p data-rematch-status>${waiting}</p><div class="actions"><button data-act="pvpleave">Leave</button></div></div>`;
       return;
     }
     const sess = this.pvp.session;
@@ -887,6 +1042,8 @@ export class Game {
     P.view.busy = false;
     P.view.status = '';
     P.view.code = '';
+    P.pickListen?.abort();
+    P.pickListen = undefined;
     const s = P.session;
     P.session = null;
     P.inMatch = false;
@@ -1184,6 +1341,12 @@ export class Game {
   toggleBuffs() {
     if (!this.spec.gacha && !this.sim.fighters.some((f) => f.cards.length)) return;
     if (this.buffsEl.classList.contains('show')) return this.hideBuffs();
+    if (this.sim.opts.royale && this.roomLink?.view.phase === 'draft' && this.draft.open) return;
+    if (this.sim.opts.royale) {
+      this.buffsEl.innerHTML = buffPanelHtml(this.sim.fighters.map((f) => this.spec.names?.[f.team] ?? f.def.displayName), this.sim.fighters.map((f) => f.cards), this.select.detailed);
+      this.buffsEl.classList.add('show');
+      return;
+    }
     const cards: [string[], string[]] = [0, 1].map((t) => this.sim.fighters.find((f) => f.team === t)?.cards ?? []) as [string[], string[]];
     const names = this.spec.names ?? [this.teams()[0].map((d) => d.displayName).join(' & '), this.teams()[1].map((d) => d.displayName).join(' & ')];
     this.buffsEl.innerHTML = buffPanelHtml(names as [string, string], cards, this.select.detailed);
@@ -1217,7 +1380,7 @@ export class Game {
       if (this.cutT <= 0) {
         const rest = this.pending;
         this.pending = [];
-        this.handle(rest);
+        this.handle(rest, true);
       }
     } else {
       const running = this.started && !this.paused && !this.sim.over;
@@ -1252,23 +1415,32 @@ export class Game {
     this.scene.render(this.sim, alpha, dt, simDt || (this.sim.over ? dt * this.juice.timeScale : 0));
     this.hud.update(this.sim, dt);
 
+    const roomReady = !room || (
+      this.roomRun?.fightBuilt && !this.roomRun.blocked && !this.roomRun.shownResult &&
+      room.view.phase === 'fight' && room.clock() >= room.view.at
+    );
+    const battle = this.started && !this.sim.over && !this.sim.paused && !this.drafting && roomReady;
+    const audible = battle && !this.paused && this.introT <= 0;
     for (const f of this.sim.fighters)
-      this.sfx.charge(f.idx, this.started && !this.paused && !frozen && f.state === 'charge' ? Math.min(1, f.stateT / f.stateDur) : null);
+      this.sfx.charge(f.idx, audible && !frozen && f.state === 'charge' ? Math.min(1, f.stateT / f.stateDur) : null);
 
-    if (this.started && !this.sim.over && !this.paused && this.introT <= 0 && !this.replaying) {
+    if (this.started && (!battle || this.replaying)) this.sfx.mood('off');
+    if (audible && !this.replaying) {
       const low = this.sim.fighters.some((f) => f.state !== 'ko' && f.hp / f.maxHp < 0.3);
       const left = this.sim.timeLimit - this.sim.t;
       this.sfx.mood(low || left < 15 ? 'tense' : 'fight');
-      // the clock ticks out loud over the last ten seconds
-      const sec = Math.ceil(left);
-      if (sec <= 10 && sec !== this.lastTick) {
-        this.lastTick = sec;
-        this.sfx.tick(sec <= 3);
-      }
-      this.heartT -= dt;
-      if (low && this.heartT <= 0) {
-        this.heartT = 0.85;
-        this.sfx.heartbeat();
+      if (room || !frozen) {
+        // The room clock keeps running through local effects.
+        const sec = Math.ceil(left);
+        if (simDt > 0 && sec > 0 && sec <= 10 && (this.lastTick < 0 || sec < this.lastTick)) {
+          this.lastTick = sec;
+          this.sfx.tick(sec <= 3);
+        }
+        this.heartT -= dt;
+        if (simDt > 0 && low && this.heartT <= 0) {
+          this.heartT = 0.85;
+          this.sfx.heartbeat();
+        }
       }
     }
 
@@ -1286,7 +1458,7 @@ export class Game {
           this.panel.classList.remove('wide');
           this.panel.innerHTML = this.spec.result();
           this.panel.classList.add('show');
-        } else renderResults(this.panel, this.sim, TEAM_HEX, inBracket ? { tourney: roundName(this.tourney!, this.match!.r) } : { actions: this.spec.resultActions, names: this.spec.names });
+        } else renderResults(this.panel, this.sim, TEAM_HEX, inBracket ? { tourney: roundName(this.tourney!, this.match!.r) } : { actions: this.spec.resultActions, names: this.spec.names, localSide: this.spec.localSide });
       }
     }
   }
@@ -1297,13 +1469,13 @@ export class Game {
   private lastHitBy: Record<number, number> = {};
 
   // ---------------- events → feel ----------------
-  private handle(events: SimEvent[]) {
+  private handle(events: SimEvent[], resumedSpecial = false) {
     const j = this.juice;
     const fx = this.scene.fx;
     const on = j.enabled;
     const F = this.sim.fighters;
     const view = (i: number) => this.scene.views[i];
-    const sc = (i: number) => ((F[i].def.radius / 32) * VIS) / DEPTH.k;
+    const sc = (i: number) => this.scene.views[i].visualSize / DEPTH.k;
 
     for (let k = 0; k < events.length; k++) {
       const e = events[k];
@@ -1496,28 +1668,25 @@ export class Game {
         }
         case 'skill': {
           const a = F[e.a];
-          const col = castColor(a.def);
-          this.hud.skillFired(e.a, e.kind);
-          if (e.kind === 'special') {
-            // freeze time and play the cutscene; the rest of this tick's events wait for it
-            // the first special of each fighter gets the full cutscene; repeats get the short one
+          const special = e.kind === 'special';
+          if (special && !(resumedSpecial && k === 0)) {
+            // Local battles hold the arena cues and impact until the cutscene clears.
             const casts = (this.specialCasts[e.a] = (this.specialCasts[e.a] ?? 0) + 1);
             const mode = this.replaying ? 'off' : this.cutMode === 'full' && casts > 1 ? 'short' : this.cutMode;
             this.sfx.special(a.def.id);
-            this.castCues(e.a, e.name, true, col);
             if (mode !== 'off') {
               this.cutscene.play(a.def, a.team, mode);
-              if (this.roomLink) break; // the room clock continues during the presentation
-              this.cutT = CUTSCENE_DUR[mode];
-              this.pending = events.slice(k + 1);
-              j.addTrauma(0.3);
-              return;
+              if (!this.roomLink) {
+                this.cutT = CUTSCENE_DUR[mode];
+                this.pending = events.slice(k);
+                j.addTrauma(0.3);
+                return;
+              }
             }
-            break;
           }
-          this.sfx.skill(a.def.id);
-          if (on) fx.ring(a.x, a.y, col, 110, 0.4, 7);
-          this.castCues(e.a, e.name, false, col);
+          if (!special) this.sfx.skill(a.def.id);
+          this.hud.skillFired(e.a, e.kind);
+          this.castCues(e.a, e.name, special, castColor(a.def));
           break;
         }
         case 'hazard': {
@@ -1622,11 +1791,12 @@ export class Game {
           this.sfx.mood('off');
           // winners cheer and celebrate; a draw gets a sad trombone
           const winners = F.filter((f) => f.team === e.winner && f.state !== 'ko');
+          const match = this.sim;
           setTimeout(() => {
-            this.sfx.jingle(winners.length ? 'win' : 'draw');
+            if (this.started && this.sim === match) this.sfx.jingle(winners.length ? 'win' : 'draw');
           }, e.reason === 'ko' ? 900 : 300);
           for (const f of winners) this.scene.views[f.idx]?.celebrate();
-          if (on && winners.length) this.scene.fx.confetti(TEAM_COLORS[e.winner as 0 | 1]);
+          if (on && winners.length) this.scene.fx.confetti(TEAM_COLORS[winners[0].team]);
           break;
         }
       }
@@ -1644,14 +1814,16 @@ export class Game {
     if (!v) return;
     const a = F[i];
     const tint = special ? 0xffd23f : col;
+    fx.castPlate(() => v.point('head'), name, special ? tint : TEAM_COLORS[a.team], special, a.def.displayName.toUpperCase(), this.juice.enabled);
+    if (!this.juice.enabled) return;
     const c = v.point('chest');
-    if (this.juice.enabled) fx.castBurst(c.x, c.y, tint, special);
-    fx.castPlate(() => v.point('head'), name, col, special, special ? 'SPECIAL' : a.def.displayName.toUpperCase());
+    fx.castBurst(c.x, c.y, tint, special);
+    fx.ring(a.x, a.y, tint, special ? 176 : 130, special ? 0.65 : 0.45, special ? 11 : 8);
     const t = F[a.targetIdx];
     const tv = t && this.scene.views[t.idx];
     if (t && tv && t.state !== 'ko' && t.team !== a.team) {
-      fx.telegraph(() => v.point('feet'), () => tv.point('feet'), tint, special ? 0.6 : 0.45);
-      fx.reticle(() => tv.point('feet'), tint, special ? 1 : 0.75);
+      fx.telegraph(() => v.point('feet'), () => tv.point('feet'), tint, special ? 0.75 : 0.55);
+      fx.reticle(() => tv.point('feet'), tint, special ? 1.1 : 0.85);
     }
   }
 
@@ -1661,7 +1833,7 @@ export class Game {
     const j = this.juice;
     const F = this.sim.fighters;
     const a = F[e.a];
-    const h = (i: number) => (HEIGHT * (F[i].def.radius / 32) * VIS) / DEPTH.k;
+    const h = (i: number) => HEIGHT * this.scene.views[i].visualSize / DEPTH.k;
     const at = (i: number, part: 'tip' | 'hand' | 'shoulder' | 'head' | 'chest' | 'feet') => this.scene.views[i].point(part);
     switch (e.fx) {
       case 'cone': {

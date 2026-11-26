@@ -1,11 +1,11 @@
 import { ROOM_RULES } from './roomVersion';
 import { ROOM_WIRE_VERSION, type RoomAction, type RoomPacket, type RoomView } from './roomWire';
-import type { PvpMode } from './pvpModes';
+import { PVP_MODES, type PvpMode } from './pvpModes';
 
 export const roomService = import.meta.env.VITE_PVP_ROOM_URL?.trim();
 const STORAGE_KEY = 'jobwars-pvp-room';
 const cancelled = () => new Error('cancelled');
-type Destination = { mode: PvpMode; mmr: number; code?: string; token?: string; tier?: number };
+export type Destination = { mode: PvpMode; mmr: number; code?: string; token?: string; tier?: number; displayName?: string };
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function savedRoom(): Destination | null {
@@ -30,6 +30,7 @@ function endpoint(path: string, destination: Destination) {
     mmr: String(destination.mmr), v: String(ROOM_WIRE_VERSION), rules: ROOM_RULES,
     ...(path.startsWith('/room/') ? {} : { mode: destination.mode }),
     ...(destination.tier === undefined ? {} : { tier: String(destination.tier) }),
+    ...(destination.displayName === undefined || destination.token ? {} : { name: destination.displayName }),
   }).toString();
   return url;
 }
@@ -102,6 +103,7 @@ export class RoomClient {
   static async open(destination: Destination, signal: AbortSignal, status: (message: string) => void): Promise<RoomClient> {
     let target = destination;
     if (destination.tier !== undefined) {
+      if (PVP_MODES[destination.mode].royale) throw new Error('Battle Royale requires an invite lobby.');
       const { initial, ws } = await connect('/quick', destination, signal, () => status('Waiting for an opponent…'));
       ws.close();
       if (initial.t !== 'match') throw new Error('Invalid matchmaking response.');
@@ -151,9 +153,12 @@ export class RoomClient {
     this.destination = { mode: room.mode, mmr: this.destination.mmr, code: packet.code, token: packet.token ?? this.destination.token };
     if (room.phase === 'closed') clearSavedRoom();
     else storeSeat(this.destination);
+    const picking = room.phase === (PVP_MODES[room.mode].royale ? 'waiting' : 'picks');
+    const ready = room.ready[room.team];
     for (const [key, action] of this.pending) {
       if (action.match !== room.match || room.phase === 'closed' ||
-        (action.t === 'lock' && (room.ready[room.team] || room.phase !== 'picks')) ||
+        (action.t === 'lock' && (!picking || ready)) ||
+        (action.t === 'unlock' && (!picking || !ready)) ||
         (action.t === 'card' && (room.chosen || room.pick !== action.pick || room.phase !== 'draft')) ||
         (action.t === 'reroll' && (room.rerolls >= action.reroll || room.pick !== action.pick || room.phase !== 'draft')) ||
         (action.t === 'report' && (room.phase === 'result' || room.reported === action.tick || action.tick < room.tick)) ||
@@ -161,9 +166,13 @@ export class RoomClient {
     }
   }
 
+  unlock() { this.send({ t: 'unlock', match: this.view.match }); }
+
   send(action: RoomAction) {
     if (this.ended) return;
-    this.pending.set(action.t === 'reroll' ? `reroll-${action.pick}-${action.reroll}` : action.t, action);
+    if (action.t === 'lock') this.pending.delete('unlock');
+    if (action.t === 'unlock') this.pending.delete('lock');
+    if (action.t !== 'start') this.pending.set(action.t === 'reroll' ? `reroll-${action.pick}-${action.reroll}` : action.t, action);
     this.sendRaw(action);
   }
 

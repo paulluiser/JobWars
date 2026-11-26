@@ -130,19 +130,19 @@ export class DraftOverlay {
           <button data-detail>${v.detailed ? 'Simple' : 'Detailed'}</button>
         </div>
         <div class="dr-owned"><span>Your cards</span>${strip(v.owned)}</div>
-        <div class="dr-owned rival"><span>${esc(v.rivalName)}</span>${strip(v.rivalOwned)}</div>
+        ${v.rivalName ? `<div class="dr-owned rival"><span>${esc(v.rivalName)}</span>${strip(v.rivalOwned)}</div>` : ''}
       </div>`;
   }
 }
 
 /** Both sides' cards, side by side (the "Cards" button / B key during a Gacha match). */
-export function buffPanelHtml(names: [string, string], cards: [string[], string[]], detailed: boolean) {
-  const col = (i: 0 | 1) => {
+export function buffPanelHtml(names: string[], cards: string[][], detailed: boolean) {
+  const col = (_: string, i: number) => {
     const list = cards[i].map((id) => CARD_BY_ID.get(id)).filter(Boolean) as Card[];
     return `<div class="bp-col ${i ? 'red' : 'blue'}">
       <div class="bp-name">${esc(names[i])} <span>${list.length} card${list.length === 1 ? '' : 's'}</span></div>
       ${list.map((c) => `<div class="bp-card r-${c.rarity}" style="--rc:${RARITY_COLOR[c.rarity]}">${cardIcon(c)}<div><b>${esc(c.name)}</b>${tag(c)}<p>${esc(detailed ? c.detailed : c.simple)}</p></div></div>`).join('') || '<p class="bp-none">No cards yet.</p>'}
     </div>`;
   };
-  return `<div class="bp-box"><div class="bp-head">Cards in play <button data-act="buffs">Close (B)</button></div><div class="bp-cols">${col(0)}${col(1)}</div></div>`;
+  return `<div class="bp-box"><div class="bp-head">Cards in play <button data-act="buffs">Close (B)</button></div><div class="bp-cols">${names.map(col).join('')}</div></div>`;
 }

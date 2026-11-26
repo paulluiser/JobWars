@@ -1,7 +1,7 @@
 import { ROSTER } from '../data/roster';
 import { ARENA_NAMES, isArenaId, type ArenaChoice } from '../data/arenas';
 import type { Sim } from '../sim/sim';
-import type { Fighter, FighterDef, Role } from '../sim/types';
+import type { BattleSide, Fighter, FighterDef, Role } from '../sim/types';
 import { face } from './face';
 import { signature } from '../data/attributes';
 import { SIZES, type Format } from '../modes/tournament';
@@ -16,7 +16,7 @@ export const ROLE_COLORS: Record<Role, string> = {
   Tank: '#2b4a8a', Fighter: '#d9452b', Assassin: '#2a2a2a', Mage: '#7a4ab8', Marksman: '#3f8a4a', Support: '#f2efe6', Controller: '#e8892a',
 };
 
-/** The 11 attributes, read from the live (tuned) stats so the bars tell the truth. */
+/** Profile attributes from the live, tuned fighter definitions. */
 const ATTR_ROWS: { label: string; get: (d: FighterDef) => number; fmt: (v: number) => string; invert?: boolean }[] = [
   { label: 'HP', get: (d) => d.hp, fmt: (v) => String(v) },
   { label: 'Attack', get: (d) => d.atk, fmt: (v) => String(Math.round(v)) },
@@ -29,19 +29,21 @@ const ATTR_ROWS: { label: string; get: (d: FighterDef) => number; fmt: (v: numbe
   { label: 'Block', get: (d) => d.blockChance, fmt: (v) => `${Math.round(v * 100)}%` },
   { label: 'Crit', get: (d) => d.critChance, fmt: (v) => `${Math.round(v * 100)}%` },
   { label: 'Weight', get: (d) => d.weight, fmt: (v) => v.toFixed(2) },
+  { label: 'Skill power', get: (d) => d.skillAtk ?? d.atk, fmt: (v) => String(Math.round(v)) },
 ];
 
 function statBars(d: FighterDef) {
   const sig = signature(d.id);
+  const statName = (label: string) => label === 'Attack' ? 'Basic attack' : label;
   const rows = ATTR_ROWS.map(({ label, get, fmt }) => {
     const vals = ROSTER.map(get);
     const min = Math.min(...vals), max = Math.max(...vals);
     const v = get(d);
     const p = 8 + ((v - min) / (max - min || 1)) * 92;
     const cls = label === sig.best ? 'best' : label === sig.worst ? 'worst' : '';
-    return `<div class="stat ${cls}"><span>${label}</span><div class="sbar"><div style="width:${p.toFixed(0)}%"></div></div><b>${fmt(v)}</b></div>`;
+    return `<div class="stat ${cls}"><span>${statName(label)}</span><div class="sbar"><div style="width:${p.toFixed(0)}%"></div></div><b>${fmt(v)}</b></div>`;
   }).join('');
-  return `<div class="sig"><span class="sig-best">Strength: ${sig.best}</span><span class="sig-worst">Weakness: ${sig.worst}</span></div><div class="stats">${rows}</div>`;
+  return `<div class="sig"><span class="sig-best">Strength: ${statName(sig.best)}</span><span class="sig-worst">Weakness: ${statName(sig.worst)}</span></div><div class="stats">${rows}</div>`;
 }
 
 export type Mode = 'duel' | 'tag' | 'tourney';
@@ -91,6 +93,38 @@ export function setMode(st: SelectState, mode: Mode) {
   if (mode === 'tourney' && st.tFormat === 'tag' && st.tSize > 8) st.tSize = 8;
 }
 
+export function fighterProfileHtml(focus: FighterDef, detailed: boolean, skill: SkillKind) {
+  const ability = (kind: SkillKind) => {
+    const move = focus[kind];
+    const meta = kind === 'active' ? `${focus.active.cooldown}s cooldown` : kind === 'special' ? 'Full rage' : 'Always on';
+    return `<div class="skill ${kind}">
+      ${skillIcon(focus.id, kind)}
+      <div class="skill-copy"><div class="skill-tag">${kind} · ${meta}</div>
+      <div class="skill-name">${esc(move.name)}</div><p>${esc(detailed ? move.detailed : move.simple)}</p>
+      ${detailed && kind === 'special' ? `<div class="quote">“${esc(focus.special.quote)}”</div>` : ''}</div>
+    </div>`;
+  };
+  const kinds: SkillKind[] = ['passive', 'active', 'special'];
+  return `<div class="d-head">
+      <div class="d-face" style="background:${hex(focus.color)}">${face(focus, 'icon')}</div>
+      <div><div class="d-name">${esc(focus.displayName)}</div>
+      <div class="d-identity">${esc(focus.name)} <span class="d-role">${focus.role}</span></div>
+      <div class="d-title">${esc(focus.title)} · covers ${esc(focus.mergedFrom)}</div>
+      <p class="d-quirk">${esc(focus.quirk)}</p></div>
+    </div>
+    <div class="profile-stats">${statBars(focus)}</div>
+    <div class="profile-toolbar">
+      <div class="skill-tabs" role="group" aria-label="Choose a skill">${kinds.map((kind) =>
+        `<button data-inspect="${kind}" aria-pressed="${skill === kind}">${kind}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Description detail">
+        <button data-sel="simple" class="${detailed ? '' : 'on'}" aria-pressed="${!detailed}">Simple</button>
+        <button data-sel="detailed" class="${detailed ? 'on' : ''}" aria-pressed="${detailed}">Detailed</button>
+      </div>
+    </div>
+    ${ability(skill)}
+  `;
+}
+
 /**
  * Character select, in three modes:
  *  - 1v1 / Tag Team: pick every slot freely (mirror matches allowed). Clicking a badge fills the
@@ -126,7 +160,7 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
         </button>`).join('')}
         </div>
       </div>
-      <aside class="detail" aria-label="Fighter profile"></aside>
+      <aside class="detail fighter-profile" aria-label="Fighter profile"></aside>
     </div>
     <footer class="roster-footer">
       <div class="sel-foot" data-roster-actions></div>
@@ -217,36 +251,8 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
           ${tag ? `<div class="team red">${slotHtml(2)}${slotHtml(3)}</div>` : slotHtml(1)}
         </div>`);
 
-    const ability = (kind: SkillKind) => {
-      const move = focus[kind];
-      const meta = kind === 'active' ? `${focus.active.cooldown}s cooldown` : kind === 'special' ? 'Full rage' : 'Always on';
-      return `<div class="skill ${kind}">
-        ${skillIcon(focus.id, kind)}
-        <div class="skill-copy"><div class="skill-tag">${kind} · ${meta}</div>
-        <div class="skill-name">${esc(move.name)}</div><p>${esc(detailed ? move.detailed : move.simple)}</p>
-        ${detailed && kind === 'special' ? `<div class="quote">“${esc(focus.special.quote)}”</div>` : ''}</div>
-      </div>`;
-    };
-    const kinds: SkillKind[] = ['passive', 'active', 'special'];
     detail.style.setProperty('--rc', ROLE_COLORS[focus.role]);
-    update(detail, `<div class="d-head">
-        <div class="d-face" style="background:${hex(focus.color)}">${face(focus, 'icon')}</div>
-        <div><div class="d-name">${esc(focus.displayName)}</div>
-        <div class="d-identity">${esc(focus.name)} <span class="d-role">${focus.role}</span></div>
-        <div class="d-title">${esc(focus.title)} · covers ${esc(focus.mergedFrom)}</div>
-        <p class="d-quirk">${esc(focus.quirk)}</p></div>
-      </div>
-      <div class="profile-stats">${statBars(focus)}</div>
-      <div class="profile-toolbar">
-        <div class="skill-tabs" role="group" aria-label="Choose a skill">${kinds.map((kind) =>
-          `<button data-inspect="${kind}" aria-pressed="${skill === kind}">${kind}</button>`).join('')}</div>
-        <div class="seg" role="group" aria-label="Description detail">
-          <button data-sel="simple" class="${detailed ? '' : 'on'}" aria-pressed="${!detailed}">Simple</button>
-          <button data-sel="detailed" class="${detailed ? 'on' : ''}" aria-pressed="${detailed}">Detailed</button>
-        </div>
-      </div>
-      ${ability(skill)}
-    `);
+    update(detail, fighterProfileHtml(focus, detailed, skill));
 
     const position = `${teamOf(st, slot) ? 'Red' : 'Blue'}${tag ? ` ${slot % 2 + 1}` : ''}`;
     const hint = hintFlash || (tourney
@@ -347,7 +353,7 @@ export function renderSelect(panel: HTMLElement, st: SelectState, onGo: (r: Sele
 
 export const teamName = (fs: { def: FighterDef }[]) => fs.map((f) => f.def.displayName).join(' & ');
 
-export function renderResults(panel: HTMLElement, sim: Sim, teamHex: string[], opts: { tourney?: string; actions?: string; names?: [string, string] } = {}) {
+export function renderResults(panel: HTMLElement, sim: Sim, teamHex: string[], opts: { tourney?: string; actions?: string; names?: string[]; localSide?: BattleSide } = {}) {
   const w = sim.winner;
   const winners = w === -1 || w === null ? [] : sim.fighters.filter((f) => f.team === w);
   const rows: [string, (f: Fighter) => string][] = [
@@ -364,16 +370,19 @@ export function renderResults(panel: HTMLElement, sim: Sim, teamHex: string[], o
   const many = fs.length > 2;
   panel.onclick = null;
   panel.classList.remove('wide');
-  const title = !winners.length ? 'Draw' : opts.names ? `${opts.names[w as number]} win${opts.names[w as number] === 'You' ? '!' : 's'}` : `${teamName(winners)} win${winners.length > 1 ? '' : 's'}`;
+  const winner = winners[0]?.team;
+  const name = winner === undefined ? undefined : opts.names?.[winner];
+  const title = winner === undefined ? 'Draw' : opts.localSide === winner || name === 'You' ? 'You win!'
+    : name ? `${name} wins` : `${teamName(winners)} win${winners.length > 1 ? '' : 's'}`;
   const cardsRow = fs.some((f) => f.cards.length)
     ? `<tr><td>Cards</td>${fs.map((f) => `<td class="rcards">${f.cards.map((id) => CARD_BY_ID.get(id)?.glyph ?? '').join('')}</td>`).join('')}</tr>` : '';
   panel.innerHTML = `
     <div class="card ${many ? 'card-wide' : ''}">
       <div class="clip"></div>
       <div class="head"><span>${opts.tourney ? `${esc(opts.tourney.toUpperCase())} · ` : ''}MATCH REPORT · SEED ${sim.seed}</span><span>${sim.t.toFixed(1)}s</span></div>
-      <h1>${title} <span class="stamp">${winners.length ? 'Approved' : 'Tie'}</span></h1>
+      <h1>${esc(title)} <span class="stamp">${winners.length ? 'Approved' : 'Tie'}</span></h1>
       <table>
-        <tr><th></th>${fs.map((f) => `<th style="color:${teamHex[f.team]}" title="${esc(f.def.role)}">${esc(f.def.displayName)}<br>${esc(f.def.name)}</th>`).join('')}</tr>
+        <tr><th></th>${fs.map((f) => `<th style="color:${teamHex[f.team]}" title="${esc(f.def.role)}">${opts.localSide !== undefined && opts.names?.[f.team] ? `<span class="result-player">${esc(opts.names[f.team])}</span><br>` : ''}${esc(f.def.displayName)}<br>${esc(f.def.name)}</th>`).join('')}</tr>
         ${rows.map(([k, fn]) => `<tr><td>${k}</td>${fs.map((f) => `<td>${fn(f)}</td>`).join('')}</tr>`).join('')}
         ${cardsRow}
       </table>

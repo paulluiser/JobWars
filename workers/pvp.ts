@@ -1,9 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import { PVP_MODES, type PvpMode } from '../src/net/pvpModes';
 import { Room, type RoomState } from '../src/net/roomState';
-import { ROOM_CODE, ROOM_WIRE_VERSION, type RoomAction, type RoomPacket } from '../src/net/roomWire';
+import { normalizeDisplayName, ROOM_CODE, ROOM_WIRE_VERSION, type RoomAction, type RoomPacket } from '../src/net/roomWire';
 import { ROOM_RULES } from '../src/net/roomVersion';
-import type { Team } from '../src/sim/types';
+import type { BattleSide } from '../src/sim/types';
 
 interface Env {
   ROOMS: DurableObjectNamespace<PvpRoom>;
@@ -38,7 +38,7 @@ async function createRoom(env: Env, action: 'create' | 'pair', params: URLSearch
   return new Response('Could not reserve a room. Try again.', { status: 503 });
 }
 
-interface RoomSocket { team: Team; code: string }
+interface RoomSocket { team: BattleSide; code: string; token?: string }
 
 export class PvpRoom extends DurableObject<Env> {
   private room?: Room;
@@ -58,18 +58,24 @@ export class PvpRoom extends DurableObject<Env> {
     const [, action, code] = url.pathname.split('/');
     const now = Date.now();
     const mmr = Number(url.searchParams.get('mmr'));
+    const name = url.searchParams.get('name') ?? undefined;
     if (action === 'create' || action === 'pair') {
       if (this.room) return new Response(null, { status: 409 });
       const mode = url.searchParams.get('mode') ?? '';
       if (!validMode(mode)) return new Response('Unknown mode.', { status: 400 });
-      const room = this.room = new Room(mode, now);
-      room.sit(mmr, now);
+      if (action === 'pair' && PVP_MODES[mode].royale) return new Response('Battle Royale requires an invite lobby.', { status: 400 });
+      const room = new Room(mode, now);
+      const host = room.sit(mmr, now, undefined, name);
+      const guest = action === 'pair'
+        ? room.sit(Number(url.searchParams.get('rival')), now, undefined, url.searchParams.get('rivalName') ?? undefined)
+        : undefined;
+      if (host === null || guest === null) return new Response('Invalid display name.', { status: 400 });
+      this.room = room;
       if (action === 'pair') {
-        room.sit(Number(url.searchParams.get('rival')), now);
         await this.save();
         return Response.json({ code, tokens: room.seats.map((seat) => seat!.token) });
       }
-      const socket = openSocket(this.ctx, { team: 0, code } satisfies RoomSocket);
+      const socket = openSocket(this.ctx, { team: 0, code, token: room.seats[0]!.token } satisfies RoomSocket);
       await this.save();
       this.broadcast(socket.server);
       return socket.response;
@@ -80,18 +86,19 @@ export class PvpRoom extends DurableObject<Env> {
     if (room.elapse(now)) await this.changed();
     if (this.room !== room) return new Response('Lobby is no longer available.', { status: 404 });
     const token = tokenFrom(request);
-    let team: number | null;
+    let team: BattleSide | null;
     if (token) {
-      team = room.seats.findIndex((seat) => seat?.token === token);
-      if (team < 0) return new Response('Invalid reconnect token.', { status: 403 });
+      const index = room.seats.findIndex((seat) => seat?.token === token);
+      if (index < 0) return new Response('Invalid reconnect token.', { status: 403 });
+      team = index as BattleSide;
     } else {
-      team = room.sit(mmr, now);
+      team = room.sit(mmr, now, undefined, name);
       if (team === null) return new Response('This lobby is full.', { status: 409 });
       await this.save();
     }
     const prior = this.ctx.getWebSockets().find((ws) => this.attachment(ws).team === team && ws.readyState === WebSocket.OPEN);
     if (prior) prior.close(4001, 'Replaced by a newer connection');
-    const socket = openSocket(this.ctx, { team: team as Team, code } satisfies RoomSocket);
+    const socket = openSocket(this.ctx, { team, code, token: room.seats[team]!.token } satisfies RoomSocket);
     this.broadcast(socket.server);
     return socket.response;
   }
@@ -106,12 +113,15 @@ export class PvpRoom extends DurableObject<Env> {
       return;
     }
     const room = this.room;
-    const team = this.attachment(ws).team;
-    if (room.elapse(Date.now())) await this.changed();
-    if (this.room !== room) return;
-    // A delayed packet from a replaced socket cannot act for the current seat.
-    if (ws.readyState !== WebSocket.OPEN) return;
-    if (room.act(team, action as RoomAction, Date.now())) await this.changed();
+    const now = Date.now();
+    if (room.elapse(now)) await this.changed();
+    if (this.room !== room || !this.connected(ws, room)) return;
+    const { team } = this.attachment(ws);
+    const present = action.t === 'start' ? this.presence(room, this.ctx.getWebSockets()) : undefined;
+    if (room.act(team, action as RoomAction, now, present)) {
+      if (action.t === 'leave' && room.phase !== 'closed') ws.close(1000, 'Left lobby');
+      await this.changed();
+    }
   }
 
   webSocketClose(ws: WebSocket) {
@@ -127,12 +137,23 @@ export class PvpRoom extends DurableObject<Env> {
 
   private attachment(ws: WebSocket) { return ws.deserializeAttachment() as RoomSocket; }
 
+  private connected(ws: WebSocket, room: Room) {
+    const { team, token } = this.attachment(ws);
+    const seat = room.seats[team];
+    return ws.readyState === WebSocket.OPEN && !!seat && (token === seat.token || (!token && !PVP_MODES[room.mode].royale));
+  }
+
+  private presence(room: Room, sockets: WebSocket[]) {
+    const present = room.seats.map(() => false);
+    for (const ws of sockets) if (this.connected(ws, room)) present[this.attachment(ws).team] = true;
+    return present;
+  }
+
   private broadcast(fresh?: WebSocket) {
     const room = this.room;
     if (!room) return;
-    const sockets = this.ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.OPEN);
-    const present: [boolean, boolean] = [false, false];
-    for (const ws of sockets) present[this.attachment(ws).team] = true;
+    const sockets = this.ctx.getWebSockets().filter((ws) => this.connected(ws, room));
+    const present = this.presence(room, sockets);
     const now = Date.now();
     for (const ws of sockets) {
       const { team, code } = this.attachment(ws);
@@ -166,14 +187,16 @@ export class PvpRoom extends DurableObject<Env> {
   }
 }
 
-interface QueueSocket { mode: PvpMode; tier: number; mmr: number; since: number; pairing?: boolean }
+interface QueueSocket { mode: PvpMode; tier: number; mmr: number; since: number; name?: string; pairing?: boolean }
 
 export class PvpQueue extends DurableObject<Env> {
   async fetch(request: Request) {
     const params = new URL(request.url).searchParams;
-    const mode = params.get('mode') as PvpMode;
+    const mode = params.get('mode') ?? '';
+    if (!validMode(mode) || PVP_MODES[mode].royale) return new Response('This mode is unavailable in matchmaking.', { status: 400 });
     const { response } = openSocket(this.ctx, {
       mode, tier: Number(params.get('tier')), mmr: Number(params.get('mmr')), since: Date.now(),
+      name: params.get('name') ?? undefined,
     } satisfies QueueSocket);
     await this.ctx.blockConcurrencyWhile(() => this.pair());
     return response;
@@ -202,6 +225,8 @@ export class PvpQueue extends DurableObject<Env> {
       try {
         const response = await createRoom(this.env, 'pair', new URLSearchParams({
           mode: host.data.mode, mmr: String(host.data.mmr), rival: String(guest.data.mmr),
+          ...(host.data.name === undefined ? {} : { name: host.data.name }),
+          ...(guest.data.name === undefined ? {} : { rivalName: guest.data.name }),
         }));
         if (!response.ok) throw new Error('Could not create a match.');
         const { code, tokens } = await response.json<{ code: string; tokens: [string, string] }>();
@@ -233,11 +258,14 @@ export default {
     const mode = url.searchParams.get('mode') ?? '';
     const mmr = Number(url.searchParams.get('mmr'));
     if (!Number.isSafeInteger(mmr) || mmr < 0 || mmr > 100_000 || extra) return new Response('Invalid lobby request.', { status: 400 });
+    const name = url.searchParams.get('name');
+    if (name !== null && normalizeDisplayName(name) === null) return new Response('Invalid display name.', { status: 400 });
     if ((route === 'create' || route === 'quick') && !validMode(mode)) return new Response('Unknown mode.', { status: 400 });
     const { success } = await env.PVP_LIMIT.limit({ key: request.headers.get('cf-connecting-ip') ?? 'local' });
     if (!success) return new Response('Too many lobby attempts.', { status: 429 });
     if (route === 'create' && !code) return createRoom(env, 'create', url.searchParams, request);
     if (route === 'quick' && !code) {
+      if (PVP_MODES[mode as PvpMode].royale) return new Response('Battle Royale requires an invite lobby.', { status: 400 });
       const tier = Number(url.searchParams.get('tier'));
       if (!Number.isInteger(tier) || tier < 0 || tier > 6) return new Response('Invalid rank tier.', { status: 400 });
       return env.QUEUE.getByName(mode).fetch(request);

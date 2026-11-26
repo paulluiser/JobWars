@@ -2,18 +2,16 @@
 // win rate, then writes src/data/balance.ts.   npm run tune [-- rounds=8 games=2]
 import { writeFileSync } from 'node:fs';
 import { Sim } from '../src/sim/sim';
-import { DESIGNED } from '../src/data/roster';
+import { applyJobBalance, DESIGNED } from '../src/data/roster';
 import { BALANCE } from '../src/data/balance';
-import type { FighterDef } from '../src/sim/types';
 
 const ROUNDS = Number(process.argv[2] ?? 8);
 const GAMES = Number(process.argv[3] ?? 2);
 // continue from the current table so repeated runs refine instead of restarting
 const mult: Record<string, { atk: number; hp: number }> = Object.fromEntries(DESIGNED.map((d) => [d.id, { ...(BALANCE[d.id] ?? { atk: 1, hp: 1 }) }]));
-const apply = (d: FighterDef): FighterDef => ({ ...d, atk: d.atk * mult[d.id].atk, hp: Math.round(d.hp * mult[d.id].hp) });
 
 function round(seedBase: number) {
-  const defs = DESIGNED.map(apply);
+  const defs = DESIGNED.map((d) => applyJobBalance(d, mult[d.id]));
   const w = defs.map(() => 0), g = defs.map(() => 0);
   let len = 0, n = 0;
   for (let i = 0; i < defs.length; i++)

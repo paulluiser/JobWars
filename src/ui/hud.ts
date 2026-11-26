@@ -1,5 +1,5 @@
 import type { Sim } from '../sim/sim';
-import type { Fighter } from '../sim/types';
+import type { BattleSide, Fighter } from '../sim/types';
 import { face } from './face';
 import { CARD_BY_ID } from '../data/cards';
 import { cardIcon } from './cards';
@@ -57,7 +57,7 @@ class Banner {
   private rage: HTMLElement;
   private spT: HTMLElement;
 
-  constructor(readonly el: HTMLElement, readonly f: Fighter, teamColor: string) {
+  constructor(readonly el: HTMLElement, readonly f: Fighter, teamColor: string, playerLabel?: string) {
     const d = f.def;
     el.innerHTML = `
       <div class="strap" style="background:${teamColor}"></div>
@@ -71,6 +71,12 @@ class Banner {
         <div class="chips"></div>
         <div class="hcards"></div>
       </div>`;
+    if (playerLabel) {
+      const title = el.querySelector<HTMLElement>('.title')!;
+      title.classList.add('player-label');
+      title.textContent = playerLabel;
+      title.title = playerLabel;
+    }
     this.fill = el.querySelector('.fill')!;
     this.ghostEl = el.querySelector('.ghost')!;
     this.bar = el.querySelector('.bar')!;
@@ -107,7 +113,9 @@ class Banner {
     this.bar.classList.toggle('low', pct < 0.3);
     this.el.classList.toggle('low', pct < 0.3 && f.state !== 'ko');
     this.el.classList.toggle('down', f.state === 'ko');
-    this.num.textContent = `${Math.ceil(f.hp)} / ${f.maxHp}`;
+    this.num.textContent = this.el.classList.contains('royale-banner')
+      ? f.state === 'ko' ? 'Eliminated' : `${Math.ceil(pct * 100)}%`
+      : `${Math.ceil(f.hp)} / ${f.maxHp}`;
     this.guard.style.width = `${f.guard}%`;
     this.guard.style.background = f.guard > 50 ? '#8fd3ff' : f.guard > 25 ? '#ffd25a' : '#ff5a46';
     this.cd.style.width = `${(f.activeCd / f.def.active.cooldown) * 100}%`;
@@ -150,16 +158,33 @@ class Banner {
 
 export class Hud {
   private banners: Banner[] = [];
+  private royale = $('#royale-hud');
   private timer = $('#timer');
   private seedEl = $('#seed');
   private vig = [$('#vig0'), $('#vig1')];
   private flashEl = $('#flash');
   private callEl = $('#callout');
 
-  setup(sim: Sim, teamColors: string[]) {
-    // blue fighters take #b0, #b2 (left); red take #b1, #b3 (right)
-    const seen = [0, 0];
-    this.banners = sim.fighters.map((f) => new Banner($(`#b${f.team + 2 * seen[f.team]++}`), f, teamColors[f.team]));
+  setup(sim: Sim, teamColors: string[], yours?: BattleSide, playerNames?: string[]) {
+    this.royale.hidden = !sim.opts.royale;
+    this.royale.replaceChildren();
+    const label = (side: BattleSide) => {
+      const name = playerNames?.[side] || (sim.opts.royale ? `Player ${side + 1}` : '');
+      return name && side === yours ? `${name} (you)` : name;
+    };
+    if (sim.opts.royale) {
+      this.banners = sim.fighters.map((f) => {
+        const el = document.createElement('div');
+        el.className = f.team === yours ? 'banner royale-banner local' : 'banner royale-banner';
+        el.style.setProperty('--team-color', teamColors[f.team]);
+        this.royale.append(el);
+        return new Banner(el, f, teamColors[f.team], label(f.team));
+      });
+    } else {
+      // Blue takes #b0, #b2 (left). Red takes #b1, #b3 (right).
+      const seen = [0, 0];
+      this.banners = sim.fighters.map((f) => new Banner($(`#b${f.team + 2 * seen[f.team]++}`), f, teamColors[f.team], label(f.team)));
+    }
     for (let i = 0; i < 4; i++) $(`#b${i}`).hidden = !this.banners.some((b) => b.el.id === `b${i}`);
     this.seedEl.textContent = `Seed ${sim.seed}`;
     this.callEl.className = '';
@@ -170,7 +195,7 @@ export class Hud {
     const left = Math.max(0, Math.ceil(sim.timeLimit - sim.t));
     this.timer.textContent = String(left);
     this.timer.classList.toggle('urgent', left <= 10);
-    [0, 1].forEach((team) => this.vig[team].classList.toggle('on', sim.fighters.some((f) => f.team === team && f.state !== 'ko' && f.hp / f.maxHp < 0.3)));
+    [0, 1].forEach((team) => this.vig[team].classList.toggle('on', !sim.opts.royale && sim.fighters.some((f) => f.team === team && f.state !== 'ko' && f.hp / f.maxHp < 0.3)));
   }
 
   /** the cast skill's chip on its ID card pops, so the HUD says who just used what */

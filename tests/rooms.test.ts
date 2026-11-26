@@ -34,6 +34,36 @@ describe('authoritative room', () => {
     expect(room.seats[0]?.token).toBe('blue');
   });
 
+  it('keeps normalized names in seat order across restore and fills unnamed seats', () => {
+    const room = new Room('royaleClassic', now);
+    expect(room.sit(1000, now, 'host', '  Tía  Luz  ')).toBe(0);
+    expect(room.sit(1000, now, 'guest', '勇者')).toBe(1);
+    expect(room.sit(1000, now, 'legacy')).toBe(2);
+    const restored = Room.restore(JSON.parse(JSON.stringify(room)));
+    expect(restored.view(1, [false, true, false, false, false]).playerNames)
+      .toEqual(['Tía Luz', '勇者', 'Player 3', 'Player 4', 'Player 5']);
+  });
+
+  it.each(['', '   ', 'a\nb', 'bad\u202e', 'invisible\u034f', 'x'.repeat(25)])('rejects invalid display name %j', (name) => {
+    const room = new Room('classic1', now);
+    expect(room.sit(1000, now, 'host', name)).toBeNull();
+    expect(room.sit(1000, now, 'replacement')).toBe(0);
+  });
+
+  it('cancels a duel lock before the other player locks and accepts a replacement', () => {
+    const room = new Room('classic1', now);
+    room.sit(1000, now, 'blue');
+    room.sit(1000, now, 'red');
+    expect(room.act(0, { t: 'lock', ids: ['chef'], match: 1 }, now)).toBe(true);
+    expect(room.act(0, { t: 'unlock', match: 1 }, now)).toBe(true);
+    expect(room.view(0)).toMatchObject({ phase: 'picks', mine: [], ready: [false, false] });
+    expect(room.act(1, { t: 'lock', ids: ['nurse'], match: 1 }, now)).toBe(true);
+    expect(room.view(0).lineups).toBeNull();
+    expect(room.act(0, { t: 'lock', ids: ['builder'], match: 1 }, now)).toBe(true);
+    expect(room.view(0).lineups).toEqual([['builder'], ['nurse']]);
+    expect(room.act(0, { t: 'unlock', match: 1 }, now)).toBe(false);
+  });
+
   it('commits draft choices in seat order and replays through the same surge boundary', () => {
     const room = locked('gacha1');
     for (const team of [1, 0] as const) {
@@ -120,7 +150,7 @@ describe('authoritative room', () => {
 
   it('detects a Gacha knockout at an unreported surge boundary', () => {
     const room = locked('gacha1', 'builder');
-    room.seed = 2;
+    room.seed = 18;
     for (let phase = 0; phase < 18 && room.phase !== 'result'; phase++) {
       room.elapse(room.alarmAt);
     }
@@ -130,4 +160,159 @@ describe('authoritative room', () => {
     expect(room.result?.winner).toBe(0);
   });
 
+});
+
+const royaleJobs = ['chef', 'nurse', 'builder', 'firefighter', 'electrician'];
+const royaleLobby = (mode: 'royaleClassic' | 'royaleGacha' = 'royaleClassic', count = 5) => {
+  const room = new Room(mode, now);
+  for (let i = 0; i < count; i++) room.sit(1000, now, 'token-' + i);
+  return room;
+};
+
+describe('invite-only battle royale rooms', () => {
+  it('blocks the host from starting until a player who cancels has locked again', () => {
+    const room = royaleLobby('royaleClassic', 3);
+    const present = [true, true, true, false, false];
+    for (const team of [0, 1, 2] as const) room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now);
+    expect(room.act(2, { t: 'unlock', match: 1 }, now)).toBe(true);
+    expect(room.act(0, { t: 'start', match: 1 }, now, present)).toBe(false);
+    expect(room.act(2, { t: 'lock', ids: ['electrician'], match: 1 }, now)).toBe(true);
+    expect(room.act(0, { t: 'start', match: 1 }, now, present)).toBe(true);
+    expect(room.view(0).lineups?.[2]).toEqual(['electrician']);
+    expect(room.act(2, { t: 'unlock', match: 1 }, now)).toBe(false);
+  });
+
+  const start = { t: 'start', match: 1 } as const;
+
+  it('starts only when the host asks and at least three occupied seats are connected and locked', () => {
+    const room = royaleLobby('royaleClassic', 2);
+    const lock = (team: 0 | 1 | 2) => room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now);
+    expect(lock(0)).toBe(true);
+    expect(lock(1)).toBe(true);
+    expect(room.act(0, start, now, [true, true])).toBe(false);
+    expect(room.sit(1000, now, 'third')).toBe(2);
+    expect(room.act(0, start, now, [true, true, true])).toBe(false);
+    expect(lock(2)).toBe(true);
+    expect(room.view(0).phase).toBe('waiting');
+    expect(room.view(0).lineups).toBeNull();
+    expect(room.view(0).occupied).toEqual([true, true, true, false, false]);
+    expect(room.act(1, start, now, [true, true, true])).toBe(false);
+    expect(room.act(0, start, now, [true, true, false])).toBe(false);
+    expect(room.act(0, start, now, [true, true, true])).toBe(true);
+    expect(room.view(0).lineups).toEqual([['chef'], ['nurse'], ['builder'], [], []]);
+    expect(room.sit(1000, now, 'late')).toBeNull();
+  });
+
+  it('retains reconnect seats, clears a departing guest lock, and closes when the host leaves the lobby', () => {
+    const room = royaleLobby();
+    expect(room.sit(1000, now, 'overflow')).toBeNull();
+    room.act(1, { t: 'lock', ids: ['nurse'], match: 1 }, now);
+    const restored = Room.restore(JSON.parse(JSON.stringify(room)));
+    expect(restored.seats[1]?.token).toBe('token-1');
+    expect(restored.view(1).mine).toEqual(['nurse']);
+    expect(restored.act(1, { t: 'leave', match: 1 }, now)).toBe(true);
+    expect(restored.sit(1000, now, 'replacement')).toBe(1);
+    expect(restored.view(1).mine).toEqual([]);
+    expect(restored.act(0, { t: 'leave', match: 1 }, now)).toBe(true);
+    expect(restored.phase).toBe('closed');
+  });
+
+  it('keeps a combat seat and verifies a reported result through the simulation', () => {
+    const room = royaleLobby();
+    const seats = [0, 1, 2, 3, 4] as const;
+    for (const team of seats) {
+      expect(room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now)).toBe(true);
+    }
+    expect(room.act(0, start, now, seats.map(() => true))).toBe(true);
+    room.seed = 2;
+    const view = room.view(0);
+    const sim = roomSimulation(view);
+    stepRoom(sim, [], view.boundary);
+    const wrongWinner = sim.winner === 4 ? 3 : 4;
+    const time = view.at + Math.ceil(sim.tick * 1000 / 60);
+    room.act(4, { t: 'leave', match: 1 }, time);
+    expect(room.phase).toBe('fight');
+    expect(room.seats[4]?.token).toBe('token-4');
+    for (const team of [0, 1] as const) {
+      room.act(team, { t: 'report', tick: sim.tick, hash: 'forged', winner: wrongWinner, match: 1 }, time);
+    }
+    if (room.phase === 'fight') room.elapse(room.alarmAt);
+    expect(room.result).toEqual({ tick: sim.tick, hash: roomCheckpoint(sim), winner: sim.winner });
+  });
+
+  it('returns to the lobby when the remaining three players already voted to rematch', () => {
+    const room = royaleLobby('royaleClassic', 4);
+    const seats = [0, 1, 2, 3] as const;
+    for (const team of seats) room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now);
+    room.act(0, start, now, seats.map(() => true));
+    room.elapse(room.alarmAt);
+    expect(room.phase).toBe('result');
+    for (const team of [0, 1, 3] as const) room.act(team, { t: 'rematch', match: 1 }, room.at);
+    expect(room.phase).toBe('result');
+    expect(room.act(2, { t: 'leave', match: 1 }, room.at)).toBe(true);
+    expect(room.view(0)).toMatchObject({
+      phase: 'waiting', match: 2, occupied: [true, true, false, true, false],
+      ready: [false, false, false, false, false],
+    });
+    expect(room.sit(1000, now, 'new guest')).toBe(2);
+  });
+
+  it('closes if the host leaves the result and keeps rematches gated to at least three seats', () => {
+    const room = royaleLobby('royaleClassic', 3);
+    const seats = [0, 1, 2] as const;
+    for (const team of seats) room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now);
+    room.act(0, start, now, seats.map(() => true));
+    room.elapse(room.alarmAt);
+    expect(room.phase).toBe('result');
+    room.act(0, { t: 'rematch', match: 1 }, room.at);
+    room.act(1, { t: 'rematch', match: 1 }, room.at);
+    room.act(2, { t: 'leave', match: 1 }, room.at);
+    expect(room.view(0)).toMatchObject({ phase: 'result', match: 1, occupied: [true, true, false, false, false] });
+    expect(room.act(0, { t: 'leave', match: 1 }, room.at)).toBe(true);
+    expect(room.phase).toBe('closed');
+  });
+
+  it('applies Gacha surge cards exclusively for surviving seats and restores deterministic replay', () => {
+    const room = royaleLobby('royaleGacha');
+    const seats = [0, 2, 3, 4] as const;
+    room.act(1, { t: 'leave', match: 1 }, now);
+    for (const team of seats) {
+      expect(room.act(team, { t: 'lock', ids: [royaleJobs[team]], match: 1 }, now)).toBe(true);
+    }
+    expect(room.act(0, start, now, [true, false, true, true, true])).toBe(true);
+    room.seed = 2;
+    expect(room.view(0).eligible).toEqual([...seats]);
+    const offers = seats.map((team) => offersFor(room.seed, team, 0, 0, [byId(royaleJobs[team])!], []));
+    expect(new Set(offers.map((cards) => cards[0].rarity)).size).toBe(1);
+    room.elapse(room.alarmAt);
+    expect(room.log.map(({ team }) => team)).toEqual([...seats]);
+    let sawElimination = false;
+    while (room.phase === 'fight') {
+      const view = room.view(0);
+      const live = roomSimulation(view);
+      stepRoom(live, view.log, view.boundary);
+      room.elapse(room.alarmAt);
+      const draft = room.view(0);
+      if (draft.phase !== 'draft') break;
+      const survivors = live.fighters.filter((fighter) => fighter.hp > 0).map((fighter) => fighter.team);
+      expect(draft.eligible).toEqual(survivors);
+      expect(draft.rerolls).toBe(0);
+      const eliminated = seats.find((team) => !survivors.includes(team));
+      if (eliminated !== undefined) {
+        sawElimination = true;
+        expect(room.act(eliminated, { t: 'reroll', pick: draft.pick, reroll: 1, match: 1 }, draft.at - 1)).toBe(false);
+      }
+      const restored = Room.restore(JSON.parse(JSON.stringify(room)));
+      restored.elapse(restored.alarmAt);
+      room.elapse(room.alarmAt);
+      const next = room.view(0);
+      const target = next.tick + 10;
+      stepRoom(live, next.log, target);
+      const replay = roomSimulation(restored.view(0));
+      stepRoom(replay, restored.log, target);
+      expect(next.log.filter(({ pick }) => pick === draft.pick).map(({ team }) => team)).toEqual(survivors);
+      expect(roomCheckpoint(live)).toBe(roomCheckpoint(replay));
+    }
+    expect(sawElimination).toBe(true);
+  });
 });

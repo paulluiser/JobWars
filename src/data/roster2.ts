@@ -170,7 +170,7 @@ export const ROSTER2: FighterDef[] = [
   make({
     id: 'soldier', displayName: 'Soren', name: 'Soldier', title: 'Unit 3, squad B', role: 'Fighter', mergedFrom: 'soldier, marine',
     quirk: 'Has to reload, but gets tougher when hurt.', color: 0x606c38, accent: 0x283618, skin: 0xd9a377, stats: { range: 185, accuracy: 0.9 },
-    passive: { name: 'Battle Hardened', simple: 'Shoots from range but must reload. Gets tougher when hurt.', detailed: 'Long reach. After every 6 connecting shots, reloads for 1.2 s (no swings). Below 50% HP: DEF +20%.' },
+    passive: { name: 'Battle Hardened', simple: 'Has longer reach than other Fighters but must reload. Gets tougher when hurt.', detailed: 'Longest reach among Fighters. After every 6 connecting shots, reloads for 1.2 s (no swings). Below 50% HP: DEF +20%.' },
     active: { name: 'Frag Grenade', cooldown: 10, simple: 'A grenade that blasts the enemy back and makes it bleed.', detailed: 'Used when the foe is within 420 px. Thrown at the foe, explodes after 0.6 s in a 90 px radius: 170% ATK, big knockback, Bleed 3 s.' },
     special: { name: 'Last Stand', quote: 'Hold the line!', simple: 'Plants its feet and unloads.', detailed: 'Reloads, gains Super Armor (no stuns or knockback) for 4 s and fires 12 shots × 45% ATK. Can’t be dodged.' },
   }),

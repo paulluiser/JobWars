@@ -21,6 +21,50 @@ describe('sim', () => {
     expect(a.sim.winner).toBe(b.sim.winner);
   });
 
+  it.each([3, 4, 5])('starts a %i-fighter free-for-all equally spaced around the arena', (size) => {
+    const teams = ROSTER.slice(0, size).map((def) => [def]);
+    const sim = new Sim(teams, 42, { royale: true });
+    const gaps = sim.fighters.map((fighter, i) => sim.dist(fighter, sim.fighters[(i + 1) % size]));
+    expect(sim.fighters.map((fighter) => fighter.team)).toEqual([...Array(size).keys()]);
+    expect(Math.min(...gaps)).toBeGreaterThan(140);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.001);
+  });
+
+  it('keeps free-for-all starting positions evenly spaced when room seats are empty', () => {
+    const [a, b, c] = ROSTER;
+    const sim = new Sim([[a], [], [b], [c], []], 42, { royale: true });
+    expect(sim.fighters.map(({ team }) => team)).toEqual([0, 2, 3]);
+    const [first, second, third] = sim.fighters;
+    expect(sim.dist(first, second)).toBeCloseTo(sim.dist(second, third));
+    expect(sim.dist(first, second)).toBeCloseTo(sim.dist(third, first));
+  });
+
+  it('repeats a five-fighter free-for-all from the same seed', () => {
+    const teams = ROSTER.slice(0, 5).map((def) => [def]);
+    const first = new Sim(teams, 42, { royale: true });
+    const second = new Sim(teams, 42, { royale: true });
+    while (!first.over) expect(first.step()).toEqual(second.step());
+    expect(first.checkpoint()).toBe(second.checkpoint());
+  });
+
+  it('continues after a knockout and awards the last surviving side the win', () => {
+    const sim = new Sim(ROSTER.slice(0, 4).map((def) => [def]), 42, { royale: true });
+    const [first, second, third, last] = sim.fighters;
+    sim.damage(first, first.maxHp * 2, last.idx);
+    sim.step();
+    expect(sim.over).toBe(false);
+    expect(sim.livingSides()).toEqual([1, 2, 3]);
+    sim.damage(second, second.maxHp * 2, last.idx);
+    sim.damage(third, third.maxHp * 2, last.idx);
+    expect(sim.step()).toContainEqual({ type: 'end', winner: 3, reason: 'ko' });
+  });
+
+  it.each([[0.6, 4], [0.5, -1]])('uses health percentage at the free-for-all time limit', (lastHp, winner) => {
+    const teams = [byId('firefighter')!, byId('nurse')!, byId('builder')!, byId('miner')!, byId('courier')!].map((def) => [def]);
+    const sim = new Sim(teams, 42, { royale: true, timeLimit: 0.01, startHpPct: [0.5, 0.4, 0.4, 0.4, lastHp] });
+    expect(sim.step()).toContainEqual({ type: 'end', winner, reason: 'time' });
+  });
+
   it('different seeds give different fights', () => {
     expect(JSON.stringify(run(1).log)).not.toBe(JSON.stringify(run(2).log));
   });
