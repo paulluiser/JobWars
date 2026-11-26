@@ -69,7 +69,7 @@ export class PvpSession {
   closed = false;
   onClose: (() => void) | null = null;
 
-  private constructor(private peers: Peer[], readonly conn: DataConnection, readonly host: boolean, readonly mode: PvpMode) {
+  private constructor(private peers: Peer[], readonly conn: DataConnection, readonly host: boolean, private matchMode: PvpMode) {
     conn.on('data', (m) => {
       if (this.closed || !validMessage(m, this.mode)) return;
       if (m.t === 'bye') return this.lost();
@@ -80,6 +80,8 @@ export class PvpSession {
     conn.on('close', () => this.lost());
     conn.on('error', () => this.lost());
   }
+
+  get mode() { return this.matchMode; }
 
   private lost() {
     if (this.closed) return;
@@ -136,11 +138,17 @@ export class PvpSession {
   }
 
   /** after connecting: swap versions and ratings */
-  private async handshake(mmr: number, signal?: AbortSignal) {
-    this.send({ t: 'hello', v: PROTOCOL, mmr, mode: this.mode });
+  private async handshake(mmr: number, signal?: AbortSignal, invite = false) {
+    const followHost = invite && !this.host;
+    const hello = () => this.send({ t: 'hello', v: PROTOCOL, mmr, mode: this.mode });
+    if (!followHost) hello();
     const h = await this.wait((m): m is Extract<Msg, { t: 'hello' }> => m.t === 'hello', 8000, signal);
     if (h.v !== PROTOCOL) throw new Error('The other player is on a different version of the game. Both refresh the page and try again.');
-    if (h.mode !== this.mode) throw new Error('The other player picked a different mode.');
+    if (!invite && h.mode !== this.mode) throw new Error('The other player picked a different mode.');
+    if (followHost) {
+      this.matchMode = h.mode;
+      hello();
+    }
     this.oppMmr = h.mmr;
     if (this.closed) throw new Error("The other player disconnected.");
     this.established = true;
@@ -160,7 +168,7 @@ export class PvpSession {
       const peer = await claimPeer(`${PREFIX}-lobby-${code}`, signal);
       if (!peer) continue;
       const ready = waitIncoming(peer, signal)
-        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr, signal))
+        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr, signal, true))
         .catch((error: unknown) => {
           peer.destroy();
           throw error;
@@ -186,7 +194,7 @@ export class PvpSession {
         }
         throw new Error(`Connection to lobby ${normalized} was interrupted. Try joining again.`);
       });
-      return await new PvpSession([me], conn, false, mode).handshake(mmr, signal);
+      return await new PvpSession([me], conn, false, mode).handshake(mmr, signal, true);
     } catch (error) {
       me.destroy();
       throw error;

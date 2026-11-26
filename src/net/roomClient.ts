@@ -27,7 +27,8 @@ function endpoint(path: string, destination: Destination) {
   const url = new URL(path, roomService);
   url.protocol = url.protocol === 'https:' || url.protocol === 'wss:' ? 'wss:' : 'ws:';
   url.search = new URLSearchParams({
-    mode: destination.mode, mmr: String(destination.mmr), v: String(ROOM_WIRE_VERSION), rules: ROOM_RULES,
+    mmr: String(destination.mmr), v: String(ROOM_WIRE_VERSION), rules: ROOM_RULES,
+    ...(path.startsWith('/room/') ? {} : { mode: destination.mode }),
     ...(destination.tier === undefined ? {} : { tier: String(destination.tier) }),
   }).toString();
   return url;
@@ -61,7 +62,7 @@ function connect(
       resolve({ ws, initial: packet });
     };
     const closed = () => fail(new Error(path === '/quick' ? 'Matchmaking disconnected.' :
-      'Could not enter the lobby. Check the code and mode, and refresh both browsers.'));
+      'Could not enter the lobby. Check the code and refresh both browsers.'));
     const opened = () => onOpen?.();
     // Queue waits for a rival, not HTTP or WebSocket setup.
     const timer = setTimeout(() => fail(new Error('Connection timed out. Try again.')), path === '/quick' ? 180_000 : 12_000);

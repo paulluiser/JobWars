@@ -56,6 +56,24 @@ describe('PvP lobby connection errors', () => {
     expect(peers[0].destroy).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the host mode for invite codes even when the guest selected another mode', async () => {
+    const lobby = await PvpSession.createLobby('gacha2', 1000, new AbortController().signal);
+    const hosted = lobby.ready.catch(error => error);
+    const join = PvpSession.joinLobby(lobby.code, 'classic1', 1000);
+    const joined = join.catch(error => error);
+    await vi.advanceTimersByTimeAsync(0);
+    const host = peers[0], guest = peers[1];
+    host.emit('connection', host.connection);
+    host.connection.emit('open');
+    guest.connection.emit('open');
+    await vi.advanceTimersByTimeAsync(0);
+    host.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'classic1' });
+    guest.connection.emit('data', { t: 'hello', v: PROTOCOL, mmr: 1000, mode: 'gacha2' });
+    expect((await hosted).mode).toBe('gacha2');
+    expect((await joined).mode).toBe('gacha2');
+    expect(guest.connection.send).toHaveBeenCalledWith(expect.objectContaining({ t: 'hello', mode: 'gacha2' }));
+  });
+
   it('keeps a matched guest open if another peer lookup fails', async () => {
     const join = PvpSession.joinLobby('KC77N', 'classic1', 1000);
     await vi.advanceTimersByTimeAsync(0);

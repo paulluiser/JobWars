@@ -126,7 +126,7 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
           ${v.code ? `<div class="lobby-code">Your lobby code<b>${esc(v.code)}</b><button data-m="copycode">Copy</button></div>` : ''}
           ${v.status ? `<div class="pvp-status">${v.busy ? '<i class="spin"></i>' : ''}${esc(v.status)}${v.busy ? ' <button data-m="cancel">Cancel</button>' : ''}</div>` : ''}
           ${v.error ? `<div class="pvp-error">${esc(v.error)}</div>` : ''}
-          <p class="pvp-note">${roomHosted ? 'Online rooms can reconnect after a brief disconnect.' : 'Peer-to-peer: both of you need this page open.'} Your rating is kept in this browser.</p>
+          <p class="pvp-note">${roomHosted ? 'Online rooms can reconnect after a brief disconnect.' : 'Peer-to-peer: both of you need this page open.'} Invite codes use the host’s mode. Your rating is kept in this browser.</p>
         </div>
       </div>
     </div>`, (t) => {

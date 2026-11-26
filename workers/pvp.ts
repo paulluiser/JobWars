@@ -85,7 +85,6 @@ export class PvpRoom extends DurableObject<Env> {
       team = room.seats.findIndex((seat) => seat?.token === token);
       if (team < 0) return new Response('Invalid reconnect token.', { status: 403 });
     } else {
-      if (url.searchParams.get('mode') !== room.mode) return new Response('The host chose a different mode.', { status: 409 });
       team = room.sit(mmr, now);
       if (team === null) return new Response('This lobby is full.', { status: 409 });
       await this.save();
@@ -233,7 +232,8 @@ export default {
     const [, route, code, extra] = url.pathname.split('/');
     const mode = url.searchParams.get('mode') ?? '';
     const mmr = Number(url.searchParams.get('mmr'));
-    if (!validMode(mode) || !Number.isSafeInteger(mmr) || mmr < 0 || mmr > 100_000 || extra) return new Response('Invalid lobby request.', { status: 400 });
+    if (!Number.isSafeInteger(mmr) || mmr < 0 || mmr > 100_000 || extra) return new Response('Invalid lobby request.', { status: 400 });
+    if ((route === 'create' || route === 'quick') && !validMode(mode)) return new Response('Unknown mode.', { status: 400 });
     const { success } = await env.PVP_LIMIT.limit({ key: request.headers.get('cf-connecting-ip') ?? 'local' });
     if (!success) return new Response('Too many lobby attempts.', { status: 429 });
     if (route === 'create' && !code) return createRoom(env, 'create', url.searchParams, request);
