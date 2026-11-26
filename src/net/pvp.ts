@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
-import { ROSTER } from '../data/roster';
-import { ALL_CARDS } from '../data/cards';
+import { ROSTER, byId } from '../data/roster';
+import { ALL_CARDS, CARD_BY_ID } from '../data/cards';
+import { pvpIceConfig } from './ice';
 
 /**
  * Online PvP over WebRTC (PeerJS, using its free public broker for the handshake only).
@@ -33,20 +34,52 @@ export type Msg =
   | { t: 'rematch' }
   | { t: 'bye' };
 
+function validMessage(value: unknown, mode: PvpMode): value is Msg {
+  if (!value || typeof value !== 'object' || !('t' in value)) return false;
+  const m = value as Msg;
+  switch (m.t) {
+    case 'hello':
+      return typeof m.v === 'string' && Number.isSafeInteger(m.mmr)
+        && typeof m.mode === 'string' && Object.hasOwn(PVP_MODES, m.mode);
+    case 'picks':
+      return Array.isArray(m.ids) && m.ids.length === (PVP_MODES[mode].tag ? 2 : 1)
+        && m.ids.every((id) => typeof id === 'string' && !!byId(id));
+    case 'start':
+      return Number.isSafeInteger(m.seed);
+    case 'card':
+      return (m.team === 0 || m.team === 1) && Number.isSafeInteger(m.pick) && m.pick >= 0 && CARD_BY_ID.has(m.id);
+    case 'result':
+      return (m.winner === -1 || m.winner === 0 || m.winner === 1)
+        && typeof m.hash === 'string' && m.hash.length <= 128;
+    case 'bye':
+    case 'rematch':
+      return true;
+    default:
+      return false;
+  }
+}
+
 const PREFIX = 'jobwars-2f7c';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const QM_SLOTS = 5;
+const CONNECT_TIMEOUT = 12000;
+const cancelled = () => new Error('cancelled');
+const matchmakingUnavailable = () => new Error("Couldn't reach the matchmaking service. Check your connection and try again.");
+const peerErrorType = (error: unknown) => (error as { type?: string } | null)?.type;
 
 export class PvpSession {
   oppMmr = 1000;
   private handlers = new Set<(m: Msg) => void>();
   private inbox: Msg[] = [];
+  private established = false;
   closed = false;
   onClose: (() => void) | null = null;
 
   private constructor(private peers: Peer[], readonly conn: DataConnection, readonly host: boolean, readonly mode: PvpMode) {
-    conn.on('data', (d) => {
-      const m = d as Msg;
+    conn.on('data', (m) => {
+      if (this.closed || !validMessage(m, this.mode)) return;
+      if (m.t === 'bye') return this.lost();
+      if (this.inbox.length === 64) this.inbox.shift();
       this.inbox.push(m);
       for (const h of [...this.handlers]) h(m);
     });
@@ -57,6 +90,7 @@ export class PvpSession {
   private lost() {
     if (this.closed) return;
     this.closed = true;
+    if (this.established) this.release();
     this.onClose?.();
   }
 
@@ -65,39 +99,57 @@ export class PvpSession {
   }
 
   /** Wait for the next message matching `ok` (including ones that already arrived). */
-  wait<T extends Msg>(ok: (m: Msg) => m is T, timeoutMs = 0): Promise<T> {
+  wait<T extends Msg>(ok: (m: Msg) => m is T, timeoutMs = 0, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) return Promise.reject(cancelled());
     const i = this.inbox.findIndex(ok);
     if (i >= 0) return Promise.resolve(this.inbox.splice(i, 1)[0] as T);
     return new Promise((res, rej) => {
       let timer = 0;
+      const clean = () => {
+        this.handlers.delete(h);
+        signal?.removeEventListener('abort', abort);
+        clearTimeout(timer);
+      };
+      const abort = () => {
+        clean();
+        rej(cancelled());
+      };
       const h = (m: Msg) => {
         if (!ok(m)) return;
         this.inbox.splice(this.inbox.indexOf(m), 1);
-        this.handlers.delete(h);
-        clearTimeout(timer);
+        clean();
         res(m);
       };
       this.handlers.add(h);
-      if (timeoutMs) timer = window.setTimeout(() => (this.handlers.delete(h), rej(new Error('timeout'))), timeoutMs);
+      signal?.addEventListener('abort', abort);
+      if (timeoutMs) timer = window.setTimeout(() => {
+        clean();
+        rej(new Error('timeout'));
+      }, timeoutMs);
     });
   }
 
   close() {
+    if (this.closed) return;
     this.send({ t: 'bye' });
     this.closed = true;
-    setTimeout(() => {
-      try { this.conn.close(); } catch {}
-      for (const p of this.peers) try { p.destroy(); } catch {}
-    }, 200);
+    setTimeout(() => this.release(), 200);
+  }
+
+  private release() {
+    this.conn.close();
+    for (const peer of this.peers) peer.destroy();
   }
 
   /** after connecting: swap versions and ratings */
-  private async handshake(mmr: number) {
+  private async handshake(mmr: number, signal?: AbortSignal) {
     this.send({ t: 'hello', v: PROTOCOL, mmr, mode: this.mode });
-    const h = await this.wait((m): m is Extract<Msg, { t: 'hello' }> => m.t === 'hello', 8000);
+    const h = await this.wait((m): m is Extract<Msg, { t: 'hello' }> => m.t === 'hello', 8000, signal);
     if (h.v !== PROTOCOL) throw new Error('The other player is on a different version of the game. Both refresh the page and try again.');
     if (h.mode !== this.mode) throw new Error('The other player picked a different mode.');
     this.oppMmr = h.mmr;
+    if (this.closed) throw new Error("The other player disconnected.");
+    this.established = true;
     return this;
   }
 
@@ -111,35 +163,36 @@ export class PvpSession {
   static async createLobby(mode: PvpMode, mmr: number, signal: AbortSignal): Promise<{ code: string; ready: Promise<PvpSession> }> {
     for (let attempt = 0; attempt < 4; attempt++) {
       const code = PvpSession.newCode();
-      const peer = await openPeer(`${PREFIX}-lobby-${code}`).catch(() => null);
+      const peer = await claimPeer(`${PREFIX}-lobby-${code}`, signal);
       if (!peer) continue;
       const ready = waitIncoming(peer, signal)
-        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr))
+        .then((conn) => new PvpSession([peer], conn, true, mode).handshake(mmr, signal))
         .catch((error: unknown) => {
           peer.destroy();
           throw error;
         });
       return { code, ready };
     }
-    throw new Error("Couldn't reach the matchmaking service. Check your connection and try again.");
+    throw new Error("Couldn't reserve a lobby code. Try creating a lobby again.");
   }
 
-  static async joinLobby(code: string, mode: PvpMode, mmr: number): Promise<PvpSession> {
+  static async joinLobby(code: string, mode: PvpMode, mmr: number, signal = new AbortController().signal): Promise<PvpSession> {
     const normalized = code.trim().toUpperCase();
-    const me = await openPeer().catch(() => {
-      throw new Error("Couldn't reach matchmaking. Check your connection and try again.");
+    const me = await openPeer(guestId(), signal).catch(() => {
+      throw signal.aborted ? cancelled() : matchmakingUnavailable();
     });
     try {
-      const conn = await dial(me, `${PREFIX}-lobby-${normalized}`, 12000).catch((error: unknown) => {
-        if ((error as { type?: string })?.type === 'peer-unavailable') {
+      const conn = await dial(me, `${PREFIX}-lobby-${normalized}`, signal).catch((error: unknown) => {
+        if (signal.aborted) throw cancelled();
+        if (peerErrorType(error) === 'peer-unavailable') {
           throw new Error(`Couldn't reach lobby ${normalized}. Ask your friend to keep the lobby open or create a fresh code.`);
         }
         if (error instanceof Error && error.message === 'timeout') {
-          throw new Error(`Connection timed out joining ${normalized}. Try a fresh lobby. If both players are on different networks, try the same Wi-Fi or another connection.`);
+          throw new Error(`Connection timed out joining ${normalized}. The game connection did not open. Try again.`);
         }
         throw new Error(`Connection to lobby ${normalized} was interrupted. Try joining again.`);
       });
-      return await new PvpSession([me], conn, false, mode).handshake(mmr);
+      return await new PvpSession([me], conn, false, mode).handshake(mmr, signal);
     } catch (error) {
       me.destroy();
       throw error;
@@ -148,59 +201,89 @@ export class PvpSession {
 
   /**
    * Quick match: look for someone waiting in your rank tier, else wait in a free slot.
-   * `status` reports progress; after ~20 s it widens to every tier.
+   * `status` reports progress; after ~20 s it widens to nearby tiers.
    */
   static async quickMatch(mode: PvpMode, mmr: number, tier: number, signal: AbortSignal, status: (s: string) => void): Promise<PvpSession> {
-    const me = await openPeer();
     const started = Date.now();
+    const nearby = [tier - 1, tier + 1, tier - 2, tier + 2].filter((t) => t >= 0 && t <= 6);
+    let nextNearby = 0;
+    let guest: Peer | undefined;
+    let matched = false;
+    const trySlot = async (id: string) => {
+      guest ??= await openPeer(guestId(), signal).catch(() => {
+        throw signal.aborted ? cancelled() : matchmakingUnavailable();
+      });
+      const conn = await dial(guest, id, signal).catch(() => null);
+      if (!conn) return null;
+      try {
+        const session = await new PvpSession([guest], conn, false, mode).handshake(mmr, signal);
+        matched = true;
+        return session;
+      } catch {
+        conn.close();
+        return null;
+      }
+    };
     try {
-      for (let loop = 0; !signal.aborted; loop++) {
+      while (!signal.aborted) {
         const wide = Date.now() - started > 20000;
-        const tiers = wide ? [tier, tier - 1, tier + 1, tier - 2, tier + 2].filter((t) => t >= 0 && t <= 6) : [tier];
-        status(wide ? 'Searching all ranks…' : 'Searching your rank…');
-        // 1. someone already waiting?
-        for (const t of tiers) for (let s = 0; s < QM_SLOTS && !signal.aborted; s++) {
-          const conn = await dial(me, `${PREFIX}-qm-${mode}-t${t}-s${s}`, 1800).catch(() => null);
-          if (conn) {
-            try {
-              return await new PvpSession([me], conn, false, mode).handshake(mmr);
-            } catch {
-              try { conn.close(); } catch {}
-            }
-          }
+        status(wide ? 'Searching nearby ranks…' : 'Searching your rank…');
+        if (wide && nearby.length) {
+          // Rotate the nearby rank so each pass sends at most one extra lookup.
+          const tierToCheck = nearby[nextNearby++ % nearby.length];
+          const session = await trySlot(`${PREFIX}-qm-${mode}-t${tierToCheck}-s0`);
+          if (session) return session;
         }
-        // 2. nobody: wait in a free slot for a while, then look again
-        for (let s = 0; s < QM_SLOTS && !signal.aborted; s++) {
-          const host = await openPeer(`${PREFIX}-qm-${mode}-t${tier}-s${s}`).catch(() => null);
-          if (!host) continue;
-          status('Waiting for an opponent…');
-          const conn = await waitIncoming(host, signal, 12000 + Math.random() * 6000).catch(() => null);
-          if (conn) {
-            try {
-              return await new PvpSession([me, host], conn, true, mode).handshake(mmr);
-            } catch {
-              try { conn.close(); } catch {}
-            }
+        for (let slot = 0; slot < QM_SLOTS && !signal.aborted; slot++) {
+          const id = `${PREFIX}-qm-${mode}-t${tier}-s${slot}`;
+          const host = await claimPeer(id, signal);
+          if (!host) {
+            const session = await trySlot(id);
+            if (session) return session;
+            continue;
           }
-          host.destroy();
+          status('Waiting for an opponent…');
+          try {
+            const conn = await waitIncoming(host, signal, 20000);
+            return await new PvpSession([host], conn, true, mode).handshake(mmr, signal);
+          } catch (error) {
+            host.destroy();
+            if (signal.aborted || (error instanceof Error && error.message.includes('disconnected'))) throw error;
+          }
           break;
         }
+        if (!signal.aborted) await new Promise((resolve) => setTimeout(resolve, 1500));
       }
-      throw new Error('cancelled');
-    } catch (e) {
-      me.destroy();
-      throw e;
+      throw cancelled();
+    } finally {
+      if (!matched) guest?.destroy();
     }
   }
 }
 
 // ---------------- PeerJS helpers ----------------
 
-function openPeer(id?: string): Promise<Peer> {
+const guestId = () => `${PREFIX}-guest-${crypto.randomUUID()}`;
+
+async function claimPeer(id: string, signal: AbortSignal): Promise<Peer | null> {
+  try {
+    return await openPeer(id, signal);
+  } catch (error) {
+    if (signal.aborted) throw cancelled();
+    if (peerErrorType(error) === 'unavailable-id') return null;
+    throw matchmakingUnavailable();
+  }
+}
+
+async function openPeer(id: string, signal: AbortSignal): Promise<Peer> {
+  if (signal.aborted) throw cancelled();
+  const config = await pvpIceConfig();
+  if (signal.aborted) throw cancelled();
   return new Promise((res, rej) => {
-    const p = id ? new Peer(id, { debug: 0 }) : new Peer({ debug: 0 });
+    const p = new Peer(id, { debug: 0, config });
     const clean = () => {
       clearTimeout(t);
+      signal.removeEventListener('abort', abort);
       p.off('open', opened);
       p.off('error', fail);
     };
@@ -213,19 +296,23 @@ function openPeer(id?: string): Promise<Peer> {
       p.destroy();
       rej(error);
     };
+    const abort = () => fail(cancelled());
     const t = setTimeout(() => fail(new Error('timeout')), 9000);
+    signal.addEventListener('abort', abort);
     p.on('open', opened);
     p.on('error', fail);
   });
 }
 
 /** Open the data channel, keeping signaling and channel failures distinct. */
-function dial(me: Peer, id: string, timeoutMs: number): Promise<DataConnection> {
+function dial(me: Peer, id: string, signal: AbortSignal): Promise<DataConnection> {
+  if (signal.aborted) return Promise.reject(cancelled());
   return new Promise((res, rej) => {
     const conn = me.connect(id, { reliable: true });
     if (!conn) return rej(new Error('disconnected'));
     const clean = () => {
       clearTimeout(t);
+      signal.removeEventListener('abort', abort);
       me.off('error', onErr);
       me.off('disconnected', disconnected);
       conn.off('open', opened);
@@ -245,7 +332,9 @@ function dial(me: Peer, id: string, timeoutMs: number): Promise<DataConnection> 
       clean();
       res(conn);
     };
-    const t = setTimeout(() => fail(new Error('timeout')), timeoutMs);
+    const abort = () => fail(cancelled());
+    const t = setTimeout(() => fail(new Error('timeout')), CONNECT_TIMEOUT);
+    signal.addEventListener('abort', abort);
     me.on('error', onErr);
     me.on('disconnected', disconnected);
     conn.on('close', disconnected);
@@ -271,17 +360,26 @@ function waitIncoming(peer: Peer, signal: AbortSignal, timeoutMs = 0): Promise<D
       done();
       rej(new Error('Your lobby disconnected from matchmaking. Create a new lobby and share the new code.'));
     };
-    const incoming = (conn: DataConnection) => conn.once('open', () => {
+    let connectionReceived = false;
+    const expire = () => {
       done();
-      res(conn);
-    });
+      rej(new Error('timeout'));
+    };
+    const incoming = (conn: DataConnection) => {
+      if (timeoutMs && !connectionReceived) {
+        connectionReceived = true;
+        clearTimeout(t);
+        t = setTimeout(expire, CONNECT_TIMEOUT);
+      }
+      conn.once('open', () => {
+        done();
+        res(conn);
+      });
+    };
     if (signal.aborted) return abort();
     signal.addEventListener('abort', abort);
     peer.on('disconnected', disconnected);
     peer.on('connection', incoming);
-    if (timeoutMs) t = setTimeout(() => {
-      done();
-      rej(new Error('timeout'));
-    }, timeoutMs);
+    if (timeoutMs) t = setTimeout(expire, timeoutMs);
   });
 }

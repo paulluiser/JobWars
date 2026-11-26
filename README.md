@@ -44,6 +44,20 @@ Add `?layout=portrait` to the URL to force the vertical layout, e.g. for recordi
 Static Vite build, no server. Import the repo in Vercel and it picks up `vercel.json`
 (`npm run build` → `dist/`). Or from the CLI: `npx vercel --prod`.
 
+### Cross-network PvP relay
+
+Job Wars uses PeerJS Cloud for signaling. WebRTC connects directly when the players’ networks
+allow it and falls back to a TURN relay when they don’t.
+
+1. Create a Cloudflare Realtime TURN key.
+2. In Vercel, rate-limit `POST /api/turn` by client IP with a Firewall rule before setting credentials.
+   A starting limit is five requests per minute per IP.
+3. Add `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` as server-side Vercel variables and redeploy.
+   The function issues short-lived browser credentials. The game reuses them within the same tab.
+4. Verify from separate networks, or force relay-only WebRTC in a test browser and join a fresh lobby.
+
+Without these variables, the game uses direct WebRTC with STUN.
+
 ## Layout
 
 - `src/sim/` deterministic fixed-tick combat (seeded RNG, no DOM)

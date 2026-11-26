@@ -409,14 +409,6 @@ export class Game {
 
   private async pvpAct(a: string, v: string | undefined, draw: () => void) {
     const P = this.pvp, V = P.view;
-    const fail = (e: unknown) => {
-      if (String((e as Error)?.message) === 'cancelled') return;
-      V.busy = false;
-      V.status = '';
-      V.code = '';
-      V.error = (e as Error)?.message && !/^(timeout|unavailable)$/.test((e as Error).message) ? (e as Error).message : "Couldn't connect. Check your internet connection and try again.";
-      draw();
-    };
     switch (a) {
       case 'back':
         this.pvpEnd();
@@ -428,54 +420,62 @@ export class Game {
         return draw();
       case 'cancel':
         this.pvpEnd();
-        V.busy = false;
-        V.status = '';
-        V.code = '';
         return draw();
       case 'copycode':
         try { await navigator.clipboard.writeText(V.code); } catch {}
         return;
-      case 'quick': {
-        V.error = '';
-        V.busy = true;
-        V.status = 'Connecting…';
-        draw();
-        P.abort = new AbortController();
-        const mmr = loadProfile().mmr;
-        try {
-          const sess = await PvpSession.quickMatch(V.mode, mmr, tierOf(mmr), P.abort.signal, (st) => { V.status = st; draw(); });
-          this.pvpConnected(sess);
-        } catch (e) { fail(e); }
-        return;
-      }
-      case 'host': {
-        V.error = '';
-        V.busy = true;
-        V.status = 'Creating a lobby…';
-        draw();
-        P.abort = new AbortController();
-        try {
-          const { code, ready } = await PvpSession.createLobby(V.mode, loadProfile().mmr, P.abort.signal);
-          V.code = code;
-          V.status = 'Share the code. Waiting for your opponent…';
-          draw();
-          this.pvpConnected(await ready);
-        } catch (e) { fail(e); }
-        return;
-      }
+      case 'quick':
+      case 'host':
       case 'join': {
+        if (V.busy) return;
         const code = (v ?? '').trim().toUpperCase();
-        if (code.length !== 5) {
+        if (a === 'join' && !/^[A-Z0-9]{5}$/.test(code)) {
           V.error = 'Lobby codes are 5 characters.';
           return draw();
         }
+
+        const attempt = new AbortController();
+        P.abort = attempt;
+        const active = () => P.abort === attempt && !attempt.signal.aborted;
+        const status = (message: string) => {
+          if (!active()) return;
+          V.status = message;
+          draw();
+        };
         V.error = '';
         V.busy = true;
-        V.status = `Joining ${code}…`;
-        draw();
+        const mmr = loadProfile().mmr;
+        const mode = V.mode;
         try {
-          this.pvpConnected(await PvpSession.joinLobby(code, V.mode, loadProfile().mmr));
-        } catch (e) { fail(e); }
+          let session: PvpSession;
+          if (a === 'quick') {
+            status('Connecting…');
+            session = await PvpSession.quickMatch(mode, mmr, tierOf(mmr), attempt.signal, status);
+          } else if (a === 'host') {
+            status('Creating a lobby…');
+            const lobby = await PvpSession.createLobby(mode, mmr, attempt.signal);
+            if (active()) {
+              V.code = lobby.code;
+              status('Share the code. Waiting for your opponent…');
+            }
+            session = await lobby.ready;
+          } else {
+            status(`Joining ${code}…`);
+            session = await PvpSession.joinLobby(code, mode, mmr, attempt.signal);
+          }
+          if (!active()) return session.close();
+          P.abort = null;
+          this.pvpConnected(session);
+        } catch (error) {
+          if (!active()) return;
+          P.abort = null;
+          V.busy = false;
+          V.status = '';
+          V.code = '';
+          const message = (error as Error)?.message;
+          V.error = message && !/^(timeout|unavailable)$/.test(message) ? message : "Couldn't connect. Check your internet connection and try again.";
+          draw();
+        }
         return;
       }
     }
@@ -535,7 +535,7 @@ export class Game {
         seed = this.randomSeed();
         sess.send({ t: 'start', seed });
       } else seed = (await sess.wait((m): m is Extract<Msg, { t: 'start' }> => m.t === 'start')).seed;
-      this.pvpBegin(seed);
+      if (P.session === sess) this.pvpBegin(seed);
     };
     void sess.wait((m): m is Extract<Msg, { t: 'picks' }> => m.t === 'picks').then((m) => {
       if (P.session !== sess) return;
@@ -614,6 +614,9 @@ export class Game {
     const P = this.pvp;
     P.abort?.abort();
     P.abort = null;
+    P.view.busy = false;
+    P.view.status = '';
+    P.view.code = '';
     const s = P.session;
     P.session = null;
     P.inMatch = false;
