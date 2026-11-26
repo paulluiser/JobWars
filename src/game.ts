@@ -74,6 +74,7 @@ interface RoomRun {
   blocked: boolean;
   shownResult: boolean;
   fightBuilt: boolean;
+  rematchPending?: boolean;
 }
 
 const CLASSIC: MatchSpec = { kind: 'cpu', gacha: false, control: ['cpu', 'cpu'] };
@@ -710,15 +711,7 @@ export class Game {
     }
     if (view.phase === 'result' && view.result) {
       if (!run.shownResult) this.showRoomResult(view, run);
-      if (view.occupied && view.occupied.filter(Boolean).length < 3) {
-        const rematch = this.panel.querySelector<HTMLButtonElement>('[data-act="pvprematch"]');
-        if (rematch) {
-          rematch.disabled = true;
-          rematch.title = 'At least three players are needed for a rematch.';
-        }
-        const status = this.panel.querySelector('[data-rematch-status]');
-        if (status) status.textContent = 'At least three players are needed for a rematch.';
-      }
+      this.updateRematchVotes(view, run);
       return;
     }
     if (view.repair && run.repair !== view.repair.hash) {
@@ -846,6 +839,45 @@ export class Game {
     this.hud.callout(`${delta >= 0 ? '+' : ''}${delta} MMR`, delta >= 0 ? '#6dff9a' : '#ff5a46');
   }
 
+  private updateRematchVotes(view: RoomView, run: RoomRun) {
+    const actions = this.panel.querySelector('.actions')!;
+    const button = actions.querySelector<HTMLButtonElement>('[data-act="pvprematch"]')!;
+    let votes = this.panel.querySelector<HTMLElement>('.rematch-votes');
+    if (!votes) {
+      votes = document.createElement('section');
+      votes.className = 'rematch-votes';
+      votes.setAttribute('aria-label', 'Rematch votes');
+      votes.innerHTML = '<div class="rematch-summary" role="status"></div><ul></ul>';
+      actions.before(votes);
+    }
+    const seats = view.playerNames.flatMap((name, i) => !view.occupied || view.occupied[i] ? [{
+      name: i === view.team ? `${name} (you)` : name,
+      ready: !!view.rematch[i],
+      label: view.rematch[i] ? 'Voted' : view.present[i] ? 'Waiting' : 'Reconnecting',
+    }] : []);
+    const voted = !!view.rematch[view.team];
+    const minimum = view.occupied ? 3 : 2;
+    const enough = seats.length >= minimum;
+    if (voted || !enough) run.rematchPending = false;
+    const count = seats.filter((seat) => seat.ready).length;
+    const summary = votes.querySelector('.rematch-summary')!;
+    const message = enough ? `Rematch votes · ${count}/${seats.length}` : `Rematch requires at least ${minimum} players`;
+    if (summary.textContent !== message) summary.textContent = message;
+    const list = votes.querySelector('ul')!;
+    list.replaceChildren(...seats.map(({ name, ready, label }) => {
+      const item = document.createElement('li');
+      const player = document.createElement('span');
+      const status = document.createElement('strong');
+      player.textContent = name;
+      status.textContent = label;
+      item.classList.toggle('voted', ready);
+      item.append(player, status);
+      return item;
+    }));
+    button.disabled = !enough || voted || !!run.rematchPending;
+    button.textContent = voted ? 'Voted' : run.rematchPending ? 'Sending vote…' : 'Vote for rematch';
+  }
+
   private tickRoom(room: RoomClient, run: RoomRun) {
     const view = room.view;
     if (!run.fightBuilt || run.shownResult || run.blocked || !this.started) return 0;
@@ -860,7 +892,12 @@ export class Game {
     const target = view.phase === 'draft' ? view.tick : targetTick(view, current);
     const before = this.sim.tick;
     const catchUp = target - before > 12;
-    stepRoom(this.sim, view.log, Math.min(target, before + 480), catchUp ? undefined : (events) => this.handle(events));
+    stepRoom(this.sim, view.log, Math.min(target, before + 480), (events) => {
+      if (!catchUp) this.handle(events);
+      else if (this.sim.opts.royale && target - this.sim.tick <= 3 / DT) {
+        for (const event of events) if (event.type === 'ko') this.showElimination(event);
+      }
+    });
     if (this.sim.over || this.sim.paused) {
       const id = `${this.sim.tick}:${this.sim.over}`;
       if (run.report !== id) {
@@ -1011,9 +1048,14 @@ export class Game {
 
   pvpRematch() {
     if (this.roomLink) {
-      this.roomLink.send({ t: 'rematch', match: this.roomLink.view.match });
-      const waiting = PVP_MODES[this.roomLink.view.mode].royale ? 'Waiting for the other players…' : 'Waiting for your opponent…';
-      this.panel.innerHTML = `<div class="card"><h1>Rematch?</h1><p data-rematch-status>${waiting}</p><div class="actions"><button data-act="pvpleave">Leave</button></div></div>`;
+      const room = this.roomLink;
+      const run = this.roomRun;
+      const view = room.view;
+      const button = this.panel.querySelector<HTMLButtonElement>('[data-act="pvprematch"]');
+      if (!run || view.phase !== 'result' || !button || button.disabled) return;
+      run.rematchPending = true;
+      this.updateRematchVotes(view, run);
+      room.send({ t: 'rematch', match: view.match });
       return;
     }
     const sess = this.pvp.session;
@@ -1413,13 +1455,12 @@ export class Game {
     const frozen = this.juice.hitstop > 0 || this.cutT > 0 || this.introT > 0;
     const alpha = room || frozen ? 1 : Math.min(1, this.acc / DT);
     this.scene.render(this.sim, alpha, dt, simDt || (this.sim.over ? dt * this.juice.timeScale : 0));
-    this.hud.update(this.sim, dt);
-
     const roomReady = !room || (
       this.roomRun?.fightBuilt && !this.roomRun.blocked && !this.roomRun.shownResult &&
       room.view.phase === 'fight' && room.clock() >= room.view.at
     );
     const battle = this.started && !this.sim.over && !this.sim.paused && !this.drafting && roomReady;
+    this.hud.update(this.sim, dt, !!battle && this.introT <= 0 && !this.replaying);
     const audible = battle && !this.paused && this.introT <= 0;
     for (const f of this.sim.fighters)
       this.sfx.charge(f.idx, audible && !frozen && f.state === 'charge' ? Math.min(1, f.stateT / f.stateDur) : null);
@@ -1469,6 +1510,14 @@ export class Game {
   private lastHitBy: Record<number, number> = {};
 
   // ---------------- events → feel ----------------
+  private showElimination(event: Extract<SimEvent, { type: 'ko' }>) {
+    const label = (idx: number) => {
+      const fighter = this.sim.fighters[idx];
+      return this.spec.names?.[fighter.team] || fighter.def.displayName;
+    };
+    this.hud.elimination(label(event.b), event.by === undefined ? undefined : label(event.by));
+  }
+
   private handle(events: SimEvent[], resumedSpecial = false) {
     const j = this.juice;
     const fx = this.scene.fx;
@@ -1705,7 +1754,7 @@ export class Game {
         case 'ko': {
           const b = F[e.b];
           this.sfx.ko();
-          if (royale) this.hud.announce(`${b.def.displayName} eliminated`, '#ff856e', 2);
+          if (royale && !this.replaying) this.showElimination(e);
           if (!this.sim.over) {
             this.sfx.down();
             // a tag-team partner falls but the fight goes on: big hit, no slow-mo or zoom
@@ -1715,7 +1764,7 @@ export class Game {
               fx.ring(b.x, b.y, 0xffffff, 200, 0.5, 10);
               fx.shards(b.x, b.y - 60, b.def.color, 12);
             }
-            fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.displayName.toUpperCase()} DOWN!`, { color: 0xff5a46, size: royale ? 24 : on ? 46 : 28, toss: false, dur: royale ? 0.8 : 1.4 });
+            if (!royale) fx.text(b.x, b.y - 200 * sc(e.b), `${b.def.displayName.toUpperCase()} DOWN!`, { color: 0xff5a46, size: on ? 46 : 28, toss: false, dur: 1.4 });
             break;
           }
           j.addHitstop(0.18);

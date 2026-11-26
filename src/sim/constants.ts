@@ -48,7 +48,7 @@ export const TAG_REACH = 0.9;
 
 /**
  * Rage bar for special moves: fills by dealing damage (fraction of the target's max HP × dealt),
- * taking it (fraction of own max HP × taken) and a slow trickle per second. Full = special fires,
- * then the bar empties and fills again, so specials can repeat in a long fight.
+ * taking it (fraction of own max HP × taken) and a slow trickle per second. A special needs
+ * both full rage and an elapsed countdown. Casting restarts both.
  */
 export const RAGE = { max: 100, dealt: 80, taken: 92, passive: 1.8 };

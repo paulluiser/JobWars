@@ -96,7 +96,7 @@ export function setMode(st: SelectState, mode: Mode) {
 export function fighterProfileHtml(focus: FighterDef, detailed: boolean, skill: SkillKind) {
   const ability = (kind: SkillKind) => {
     const move = focus[kind];
-    const meta = kind === 'active' ? `${focus.active.cooldown}s cooldown` : kind === 'special' ? 'Full rage' : 'Always on';
+    const meta = kind === 'active' ? `${focus.active.cooldown}s cooldown` : kind === 'special' ? `${focus.special.cooldown}s charge · full rage` : 'Always on';
     return `<div class="skill ${kind}">
       ${skillIcon(focus.id, kind)}
       <div class="skill-copy"><div class="skill-tag">${kind} · ${meta}</div>

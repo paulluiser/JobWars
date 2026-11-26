@@ -75,7 +75,7 @@ const farmer: Kit = {
         sim.fx('drop', f.idx, t.idx, t.x, t.y, 0, 0.35, 0xf08a24, 'pumpkin');
         sim.after(0.35, () => {
           if (sim.alive(t)) {
-            sim.skillHit(f, t, 0.8, { knock: 160, canCrit: false });
+            sim.skillHit(f, t, 0.95, { knock: 160, canCrit: false });
             sim.stagger(t, 0.3);
           }
         });
@@ -392,7 +392,7 @@ const pilot: Kit = {
       sim.fx('truck', f.idx, foe.idx, foe.x, foe.y - 220, dir > 0 ? 0 : Math.PI, 1.2, 0x7b4a2a);
       volley(sim, f, 5, 0.22, (t) => {
         sim.fx('explosion', f.idx, t.idx, t.x + sim.rng.range(-25, 25), t.y, 0, 0.4, 0xff8a2a, 'fire');
-        sim.skillHit(f, t, 1, { knock: 140, canCrit: false, statuses: [{ kind: 'burn', duration: 3 }] });
+        sim.skillHit(f, t, 1.1, { knock: 140, canCrit: false, statuses: [{ kind: 'burn', duration: 3 }] });
       }, 0.3);
     },
   },
@@ -1076,7 +1076,7 @@ const athlete: Kit = {
     cast(sim, f) {
       volley(sim, f, 3, 0.45, (t, i) => {
         sim.fx('shot', f.idx, t.idx, t.x, t.y, 0, 0.18, 0xffffff, 'ball');
-        sim.skillHit(f, t, i === 2 ? 1.5 * 1.5 : 1.5, { knock: 300, canCrit: false, dir: { x: 0, y: -1 } });
+        sim.skillHit(f, t, i === 2 ? 2.5 : 1.5, { knock: 300, canCrit: false, dir: { x: 0, y: -1 } });
         sim.stagger(t, 0.4);
       }, 0.1);
     },

@@ -39,7 +39,7 @@ function makeFake(id: string): Fighter {
   const def = ROSTER.find((d) => d.id === id)!;
   return {
     idx: 0, team: 0, def, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, face: 0, hp: def.hp, maxHp: def.hp, guard: 100, guardRegenDelay: 0,
-    state: 'move', stateT: 0, stateDur: 0, attackCd: 0, activeCd: 0, special: 'locked', casting: null, kit: {}, statuses: [], ccHistory: [], targetIdx: -1,
+    state: 'move', stateT: 0, stateDur: 0, attackCd: 0, activeCd: 0, specialCd: def.special.cooldown, special: 'locked', casting: null, kit: {}, statuses: [], ccHistory: [], targetIdx: -1,
     stats: {} as Fighter['stats'], rage: 0, cards: [], aug: augOf([]), augS: {}, baseDef: def,
   };
 }

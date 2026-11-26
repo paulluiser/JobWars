@@ -67,7 +67,7 @@ class Banner {
         <div class="row"><span><span class="name" title="${d.name} · ${d.role}">${d.displayName}</span><span class="title">${d.name} · ${d.role}</span></span><span class="hpnum"></span></div>
         <div class="bar"><div class="ghost"></div><div class="fill"></div></div>
         <div class="gbar"><div></div></div>
-        <div class="skills-row"><span class="sk ac" title="${d.active.simple}"><span class="cd"></span>${skillIcon(d.id, 'active')}${d.active.name}</span><span class="sk sp" title="${d.special.simple}"><span class="rage"></span>${skillIcon(d.id, 'special')}<span class="sp-t">Rage</span></span></div>
+        <div class="skills-row"><span class="sk ac" title="${d.active.simple}"><span class="cd"></span>${skillIcon(d.id, 'active')}${d.active.name}</span><span class="sk sp" title="${d.special.name} · ${d.special.cooldown}s charge and full rage"><span class="rage"></span>${skillIcon(d.id, 'special')}<span class="sp-t">Rage</span></span></div>
         <div class="chips"></div>
         <div class="hcards"></div>
       </div>`;
@@ -120,14 +120,20 @@ class Banner {
     this.guard.style.background = f.guard > 50 ? '#8fd3ff' : f.guard > 25 ? '#ffd25a' : '#ff5a46';
     this.cd.style.width = `${(f.activeCd / f.def.active.cooldown) * 100}%`;
 
-    // rage bar: fills by dealing and taking damage; full = the special fires
+    // A special needs both a completed countdown and full rage.
     const spState = f.special === 'ready' || (f.state === 'cast' && f.casting === 'special') ? 'ready' : 'locked';
     this.rage.style.width = `${spState === 'ready' ? 100 : f.rage}%`;
     if (spState !== this.lastSp) {
       this.lastSp = spState;
       this.sp.className = `sk sp ${spState === 'ready' ? 'ready' : ''}`;
     }
-    const label = spState === 'ready' ? `${f.def.special.name}!` : `Rage ${Math.floor(f.rage)}%`;
+    const compact = this.el.classList.contains('royale-banner');
+    const charge = Math.ceil((f.specialCd - 1e-9) * 4) / 4;
+    const rage = Math.floor(f.rage);
+    const label = f.state === 'ko' ? '—'
+      : spState === 'ready' ? compact ? 'Special ready' : `${f.def.special.name}!`
+      : charge > 0 ? compact ? `SP ${charge}s` : `Special ${charge}s · ${rage}% rage`
+      : `Rage ${rage}%`;
     if (this.spT.textContent !== label) this.spT.textContent = label;
 
     // gacha cards held (newest last); the Cards panel (B) has the details
@@ -161,6 +167,9 @@ export class Hud {
   private royale = $('#royale-hud');
   private timer = $('#timer');
   private seedEl = $('#seed');
+  private nextDraft = $('#next-draft');
+  private eliminationFeed = $('#elimination-feed');
+  private eliminations: { item: HTMLLIElement; remaining: number }[] = [];
   private vig = [$('#vig0'), $('#vig1')];
   private flashEl = $('#flash');
   private callEl = $('#callout');
@@ -189,17 +198,34 @@ export class Hud {
     }
     for (let i = 0; i < 4; i++) $(`#b${i}`).hidden = !this.banners.some((b) => b.el.id === `b${i}`);
     this.seedEl.textContent = `Seed ${sim.seed}`;
+    this.nextDraft.hidden = true;
+    this.eliminationFeed.replaceChildren();
+    this.eliminations.length = 0;
     this.callEl.className = '';
     this.announcement = 0;
   }
 
-  update(sim: Sim, dt: number) {
+  update(sim: Sim, dt: number, showDraft: boolean) {
     this.announcement = Math.max(0, this.announcement - dt);
+    const draftIn = showDraft ? sim.nextDraftIn : null;
+    const draftLabel = draftIn === null ? '' : `Next draft in ${Math.max(1, Math.ceil(draftIn))}s`;
+    this.nextDraft.hidden = !draftLabel;
+    if (this.nextDraft.textContent !== draftLabel) this.nextDraft.textContent = draftLabel;
+    for (const entry of this.eliminations) entry.remaining -= dt;
+    while (this.eliminations[0]?.remaining <= 0) this.eliminations.shift()!.item.remove();
     for (const b of this.banners) b.update(dt);
     const left = Math.max(0, Math.ceil(sim.timeLimit - sim.t));
     this.timer.textContent = String(left);
     this.timer.classList.toggle('urgent', left <= 10);
     [0, 1].forEach((team) => this.vig[team].classList.toggle('on', !sim.opts.royale && sim.fighters.some((f) => f.team === team && f.state !== 'ko' && f.hp / f.maxHp < 0.3)));
+  }
+
+  elimination(victim: string, attacker?: string) {
+    const item = document.createElement('li');
+    item.textContent = attacker ? `${attacker} knocked out ${victim}` : `${victim} eliminated`;
+    if (this.eliminations.length === 2) this.eliminations.shift()!.item.remove();
+    this.eliminationFeed.append(item);
+    this.eliminations.push({ item, remaining: 5 });
   }
 
   /** the cast skill's chip on its ID card pops, so the HUD says who just used what */
@@ -218,7 +244,7 @@ export class Hud {
     this.flashEl.animate([{ opacity }, { opacity: 0 }], { duration: ms, easing: 'ease-out' });
   }
 
-  /** The large banner has one slot. An elimination can interrupt a special. */
+  /** The large banner has one slot for combat announcements. */
   announce(text: string, color: string, priority: 1 | 2) {
     if (this.announcement > 0 && priority <= this.announcementPriority) return;
     this.callout(text, color, true);

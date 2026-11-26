@@ -137,11 +137,12 @@ From 1:40, **overtime** ramps up damage and cuts healing. The **Cards** button (
 shows both sides' cards; each HUD ID card shows its card strip. Gacha has its own job-balance layer
 (`src/data/gachaBalance.ts`).
 
-### Special moves: the rage bar
+### Special moves
 
-Every fighter fills a rage bar by dealing and taking damage (plus a slow trickle). When it's full the special
-fires and the bar empties, so specials repeat in long fights. The first special of each fighter gets the full
-cutscene, repeats get the short one.
+Each fighter has a different charge time. More powerful specials take longer to charge. Rage builds as
+fighters deal and take damage, with a small amount gained over time. A fighter can cast its special once
+its countdown reaches zero and its rage bar is full. Casting starts a new countdown and spends its rage.
+The first special of each fighter gets the full cutscene, and repeats get the short one.
 
 ### Card art
 

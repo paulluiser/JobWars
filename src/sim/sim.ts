@@ -57,7 +57,7 @@ export function forTag(d: FighterDef): FighterDef {
  * swing that reaches the foe is resolved on an attack table rolled from both fighters'
  * stats: dodge → miss → block (parry / guard break) → crit → hit.
  * On top of that each job has a kit (src/sim/kits.ts): a passive, an active skill on
- * a cooldown, and a special that fires whenever its rage bar fills (dealing and taking damage).
+ * a cooldown, and a special that fires when its countdown ends and its rage bar fills.
  */
 /** Match options (Gacha and Story use these; a plain fight needs none). */
 export interface SimOpts {
@@ -96,6 +96,11 @@ export class Sim {
   readonly timeLimit: number;
   readonly surgeEvery: number;
   private nextSurge: number;
+
+  get nextDraftIn(): number | null {
+    if (this.over || this.paused || this.nextSurge >= this.timeLimit) return null;
+    return Math.max(0, this.nextSurge - this.t);
+  }
   /** waiting for card picks (a surge): step() does nothing until resume() */
   paused = false;
   surges = 0;
@@ -218,7 +223,7 @@ export class Sim {
   private gainRage(f: Fighter, amount: number) {
     if (!this.alive(f) || f.special === 'ready' || (f.state === 'cast' && f.casting === 'special')) return;
     f.rage = Math.min(RAGE.max, f.rage + amount * f.aug.rageMul);
-    if (f.rage >= RAGE.max) {
+    if (f.specialCd === 0 && f.rage >= RAGE.max) {
       f.special = 'ready';
       this.emit({ type: 'specialReady', a: f.idx });
     }
@@ -246,6 +251,7 @@ export class Sim {
       stateDur: 0,
       attackCd: this.rng.range(0.2, 0.7),
       activeCd: def.active.cooldown * this.rng.range(0.35, 0.6),
+      specialCd: def.special.cooldown,
       special: 'locked',
       casting: null,
       kit: {},
@@ -521,6 +527,7 @@ export class Sim {
     const kit = kitOf(f);
     if (f.special !== 'ready' || f.state === 'stun' || !this.alive(f) || this.has(f, 'silence')) return;
     f.special = 'locked';
+    f.specialCd = f.def.special.cooldown;
     f.rage = RAGE.max * f.aug.encore;
     f.stats.specials++;
     this.setState(f, 'cast', kit.special.castTime);
@@ -534,6 +541,7 @@ export class Sim {
   private updateTimers(f: Fighter) {
     f.attackCd = Math.max(0, f.attackCd - DT * this.rhythmOf(f));
     f.activeCd = Math.max(0, f.activeCd - DT);
+    f.specialCd = f.specialCd <= DT + 1e-9 ? 0 : f.specialCd - DT;
     f.stateT += DT;
     if (f.guardRegenDelay > 0) f.guardRegenDelay -= DT;
     else f.guard = Math.min(C.guardMax, f.guard + C.guardRegen * f.aug.guardRegenMul * DT);
@@ -992,7 +1000,7 @@ export class Sim {
     this.dealHit(a, b, Math.round(amount), false, amount > b.maxHp * 0.15, true, hx, hy, ux, uy, 200);
   }
 
-  damage(f: Fighter, dmg: number, _src: number) {
+  damage(f: Fighter, dmg: number, source: number) {
     if (!this.alive(f)) return;
     if (this.has(f, 'invuln')) return;
     const sh = this.status(f, 'shield');
@@ -1021,7 +1029,9 @@ export class Sim {
       f.statuses = [];
       f.special = 'locked';
       f.rage = 0;
-      this.emit({ type: 'ko', b: f.idx });
+      this.emit(source !== f.idx && this.fighters[source]
+        ? { type: 'ko', b: f.idx, by: source }
+        : { type: 'ko', b: f.idx });
       return;
     }
   }

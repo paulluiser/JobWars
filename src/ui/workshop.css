@@ -810,7 +810,22 @@ body .royale-banner.banner {
 #royale-hud .local { outline: 2px solid #ffdb72; outline-offset: 1px; }
 #royale-hud .down { opacity: .65; }
 #royale-hud .portrait { width: clamp(20px, 3cqw, 34px); height: auto; aspect-ratio: 1; }
-#royale-hud :is(.tape, .skills-row, .gbar, .chips, .hcards) { display: none; }
+#royale-hud :is(.tape, .sk.ac, .gbar, .chips, .hcards, .skills-row .skill-icon) { display: none; }
+#royale-hud .skills-row { margin-top: 2px; justify-content: flex-start; }
+#royale-hud .sk.sp {
+  min-width: 0; padding: 1px 4px; border-width: 1px;
+  color: #382317; font: 800 clamp(9px, .82cqw, 11px)/1.15 var(--ui); font-variant-numeric: tabular-nums;
+}
+#royale-hud .down .skills-row { visibility: hidden; }
+#elimination-feed {
+  position: absolute; right: 3%; bottom: clamp(48px, 9%, 78px);
+  display: grid; justify-items: end; gap: 4px; max-width: 55%; margin: 0; padding: 0; list-style: none;
+}
+body:not(.royale) #elimination-feed { display: none; }
+#elimination-feed li {
+  padding: 4px 8px; border: 1px solid #d2886f; border-radius: 5px; background: #261911f5;
+  color: #fff0dd; font: 800 clamp(11px, 1.15cqw, 16px)/1.15 var(--ui); overflow-wrap: anywhere;
+}
 #royale-hud :is(.name, .hpnum) { font-size: clamp(10px, 1.05cqw, 15px); }
 #royale-hud .title { display: block; margin: 0; font: 800 clamp(10px, .85cqw, 12px)/1 var(--ui); }
 #royale-hud .bar { border-width: 1px; height: 5px; }

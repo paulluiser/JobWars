@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Sim } from '../src/sim/sim';
 import { ROSTER, byId } from '../src/data/roster';
-import { ARENA_H, ARENA_W, TIME_LIMIT } from '../src/sim/constants';
+import { ARENA_H, ARENA_W, RAGE, TICK_RATE, TIME_LIMIT } from '../src/sim/constants';
 import type { FighterDef, SimEvent } from '../src/sim/types';
 
 function run(seed: number, a: FighterDef = byId('electrician')!, b: FighterDef = byId('fisher')!) {
@@ -116,6 +116,62 @@ describe('sim', () => {
     expect(cuffs.damage).toBeGreaterThan(yank.damage);
     expect(yank.control).toContainEqual(expect.objectContaining({ kind: 'silence', remaining: 1 }));
     expect(cuffs.control).toContainEqual(expect.objectContaining({ kind: 'disarm', remaining: 2 }));
+  });
+
+  it('waits for each special countdown even when both rage bars are full', () => {
+    const chef = byId('chef')!;
+    const fighter = (cooldown: number) => ({ ...chef, special: { ...chef.special, cooldown } });
+    const sim = new Sim([[fighter(2)], [fighter(3)]], 42);
+    for (const f of sim.fighters) {
+      f.rage = RAGE.max;
+      f.attackCd = f.activeCd = 99;
+    }
+
+    const casts: Array<[number, number]> = [];
+    while (sim.tick < 3 * TICK_RATE) {
+      for (const e of sim.step()) {
+        if (e.type === 'skill' && e.kind === 'special') casts.push([e.a, sim.tick]);
+      }
+    }
+    expect(casts).toEqual([[0, 2 * TICK_RATE], [1, 3 * TICK_RATE]]);
+    expect(sim.fighters[0].specialCd).toBeCloseTo(1);
+    expect(sim.fighters[1].specialCd).toBe(3);
+  });
+
+  it('waits for full rage after a special countdown elapses', () => {
+    const teacher = byId('teacher')!;
+    const fighter = { ...teacher, special: { ...teacher.special, cooldown: 1 } };
+    const sim = new Sim([[fighter], [teacher]], 42);
+    const [a, b] = sim.fighters;
+    a.attackCd = b.attackCd = a.activeCd = b.activeCd = 99;
+
+    while (sim.tick < 2 * TICK_RATE) sim.step();
+    expect(a.specialCd).toBe(0);
+    expect(a.special).toBe('locked');
+    expect(a.stats.specials).toBe(0);
+
+    a.rage = RAGE.max;
+    expect(sim.step()).toContainEqual({ type: 'skill', a: 0, kind: 'special', name: teacher.special.name });
+  });
+
+  it('makes Bountiful Harvest a high-impact cast after its long charge', () => {
+    const farmer = { ...byId('farmer')!, atk: 100, skillAtk: 100 };
+    const target = { ...byId('chef')!, hp: 5000, def: 0 };
+    const sim = new Sim([[farmer], [target]], 42);
+    const [a, b] = sim.fighters;
+    a.rage = RAGE.max;
+    a.attackCd = b.attackCd = a.activeCd = b.activeCd = 99;
+    const hits: number[] = [];
+
+    while (sim.t < 25) for (const e of sim.step()) {
+      if (e.type === 'hit' && e.a === 0 && e.skill) hits.push(e.dmg);
+    }
+
+    expect(hits).toHaveLength(6);
+    for (const damage of hits) {
+      expect(damage).toBeGreaterThanOrEqual(90);
+      expect(damage).toBeLessThanOrEqual(100);
+    }
   });
 
   it('specials fire only from a full rage bar, which then empties', { timeout: 60000 }, () => {

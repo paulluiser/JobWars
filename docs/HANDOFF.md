@@ -215,12 +215,12 @@ least 9 rating points and each attribute has a single champion (enforced by test
 `damageTakenMul` …), its active (`canCast` + `cast`, with a cooldown) and its special. Skill texts exist in
 **Simple** and **Detailed** forms (`data/roster*.ts`).
 
-### 5.5 Special moves: the rage bar
+### 5.5 Special moves
 
 Rage (0–100) fills from damage dealt (fraction of the target's max HP × 80), damage taken (fraction of own max HP
-× 92) and a 1.8/s trickle (`RAGE` in `constants.ts`). Full = the special fires (the AI fires it immediately), then
-the bar empties. Specials repeat; the first per fighter gets the full cutscene, repeats the short one. Typical duel:
-first special ≈19 s in, ≈1.6 per fighter.
+× 92) and a 1.8/s trickle (`RAGE` in `constants.ts`). A special is ready when rage is full and the job's countdown
+has elapsed. Casting spends rage and restarts the countdown. The first special per fighter gets the full cutscene,
+and repeats get the short one.
 
 ### 5.6 Gacha cards (`data/cards.ts`)
 

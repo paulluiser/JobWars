@@ -63,31 +63,33 @@ export function renderMenu(panel: HTMLElement, profile: Profile, story: Progress
       <div class="m-bg">${poster ? `<div class="m-poster" style="background-image:url('${poster}')"></div>` : `<div class="m-crowd">${order.slice(0, 6).map((d, i) => `<span style="--i:${i}">${face(d, 'bust')}</span>`).join('')}</div>`}</div>
       <button class="m-settings" data-act="settings">Settings</button>
       <button class="m-heroes" data-m="heroes">View all heroes</button>
-      <div class="m-top">
-        <div class="m-title"><span>JOB</span><span>WARS</span></div>
-        <div class="m-sub">Real jobs. Real fights. Pick a shift.</div>
+      <div class="m-navigation">
+        <div class="m-top">
+          <div class="m-title"><span>JOB</span><span>WARS</span></div>
+          <div class="m-sub">Real jobs. Real fights. Pick a shift.</div>
+        </div>
+        <div class="m-cards">
+          <button class="m-card pvp" data-m="pvp" style="--i:0">
+            <span class="m-strap"></span>${emblem('mode-pvp', '⚔️', 'm-icon')}
+            <span class="m-name">Player vs Player</span>
+            <span class="m-desc">Classic or Gacha. Duel, Tag Team, or Battle Royale.</span>
+            <span class="m-meta">${rankBadge(profile.mmr)} · ${profile.wins}W ${profile.losses}L</span>
+          </button>
+          <button class="m-card story" data-m="story" style="--i:1">
+            <span class="m-strap"></span>${emblem('mode-story', '📖', 'm-icon')}
+            <span class="m-name">Story Mode</span>
+            <span class="m-desc">A career across Metro City: 24 levels, bosses, recruit all 30 jobs.</span>
+            <span class="m-meta">${cleared}/${LEVELS.length} cleared · ★ ${totalStars(story)}/${LEVELS.length * 3} · ${story.unlocked.length}/30 jobs</span>
+          </button>
+          <button class="m-card cpu" data-m="cpu" style="--i:2">
+            <span class="m-strap"></span>${emblem('mode-cpu', '🤖', 'm-icon')}
+            <span class="m-name">CPU Battle</span>
+            <span class="m-desc">Every job unlocked. 1v1, Tag Team and Tournaments, Classic or Gacha.</span>
+            <span class="m-meta">${emblem('trophy', '🏆', 'mini-emb')} All 30 jobs</span>
+          </button>
+        </div>
       </div>
-      <div class="m-cards">
-        <button class="m-card pvp" data-m="pvp" style="--i:0">
-          <span class="m-strap"></span>${emblem('mode-pvp', '⚔️', 'm-icon')}
-          <span class="m-name">Player vs Player</span>
-          <span class="m-desc">Classic or Gacha. Duel, Tag Team, or Battle Royale.</span>
-          <span class="m-meta">${rankBadge(profile.mmr)} · ${profile.wins}W ${profile.losses}L</span>
-        </button>
-        <button class="m-card story" data-m="story" style="--i:1">
-          <span class="m-strap"></span>${emblem('mode-story', '📖', 'm-icon')}
-          <span class="m-name">Story Mode</span>
-          <span class="m-desc">A career across Metro City: 24 levels, bosses, recruit all 30 jobs.</span>
-          <span class="m-meta">${cleared}/${LEVELS.length} cleared · ★ ${totalStars(story)}/${LEVELS.length * 3} · ${story.unlocked.length}/30 jobs</span>
-        </button>
-        <button class="m-card cpu" data-m="cpu" style="--i:2">
-          <span class="m-strap"></span>${emblem('mode-cpu', '🤖', 'm-icon')}
-          <span class="m-name">CPU Battle</span>
-          <span class="m-desc">Every job unlocked. 1v1, Tag Team and Tournaments, Classic or Gacha.</span>
-          <span class="m-meta">${emblem('trophy', '🏆', 'mini-emb')} All 30 jobs</span>
-        </button>
-      </div>
-      <div class="m-feature" aria-hidden="true">${order.map((d, i) => `<div class="mf" style="--i:${i}"><div class="mf-bust">${face(d, 'bust')}</div><div class="mf-tag"><b>${esc(d.displayName)}</b><span>${esc(d.name)} · ${esc(d.role)}</span></div></div>`).join('')}</div>
+      <div class="m-feature" aria-label="Featured heroes">${order.map((d, i) => `<div class="mf" style="--i:${i};--hero-light:${hex(d.accent)}"><div class="mf-bust">${face(d, 'bust')}</div><div class="mf-tag"><b>${esc(d.displayName)}</b><span>${esc(d.name)} · ${esc(d.role)}</span></div></div>`).join('')}</div>
       <div class="m-foot"><span class="rank-chip" style="--rk:${r.color}">${rankEmblem(r.name)} ${r.name}</span><span>Esc: menu · B: cards · K: share · F: fighters</span></div>
     </div>`, (t) => go(t.dataset.m as 'pvp' | 'story' | 'cpu' | 'heroes'));
   // cards lean toward the pointer

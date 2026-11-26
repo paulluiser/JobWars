@@ -97,7 +97,7 @@ export interface FighterDef {
   onCharge?: StatusApply;
   passive: SkillText;
   active: SkillText & { cooldown: number };
-  special: SkillText & { quote: string };
+  special: SkillText & { quote: string; cooldown: number };
 }
 
 export interface FighterStats {
@@ -138,7 +138,9 @@ export interface Fighter {
   stateDur: number;
   attackCd: number;
   activeCd: number;
-  /** ready when the rage bar is full; casting it empties the bar (specials repeat) */
+  /** Seconds of combat before the special can cast. Restarts after each cast. */
+  specialCd: number;
+  /** Ready when the countdown is over and the rage bar is full. */
   special: 'locked' | 'ready';
   /** 0–100: fills by dealing and taking damage, and slowly over time (RAGE in constants.ts) */
   rage: number;
@@ -218,5 +220,5 @@ export type SimEvent =
   | { type: 'fx'; fx: FxKind; a: number; b: number; x: number; y: number; angle: number; dur: number; color?: number; prop?: string }
   | { type: 'hazard'; action: 'spawn' | 'trigger' | 'expire'; id: number; kind: Hazard['kind']; x: number; y: number }
   | { type: 'shieldHit'; b: number; absorbed: number }
-  | { type: 'ko'; b: number }
+  | { type: 'ko'; b: number; by?: number }
   | { type: 'end'; winner: BattleSide | -1; reason: 'ko' | 'time' };

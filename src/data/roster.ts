@@ -37,6 +37,7 @@ const CHEF: FighterDef = {
   },
   special: {
     name: "Chef's Special",
+    cooldown: 10.5,
     quote: 'Order up!',
     simple: 'Serves a full-course meal: big heal, clears bad effects, all three buffs.',
     detailed: 'Heals 20% max HP, cleanses all debuffs, and gains Spicy + Hearty + Light for 8 s.',
@@ -71,6 +72,7 @@ const FIREFIGHTER: FighterDef = {
   },
   special: {
     name: 'Backdraft',
+    cooldown: 13.5,
     quote: 'Stand back!',
     simple: 'Smashes a door open and a fireball blasts the enemy.',
     detailed: 'Boils off Wet, then 300% ATK with huge knockback (wall slams likely) and Burn 4 s. Can’t be dodged.',
@@ -105,6 +107,7 @@ const ELECTRICIAN: FighterDef = {
   },
   special: {
     name: 'Blackout',
+    cooldown: 15,
     quote: 'Lights out.',
     simple: 'The lights go out and lightning strikes the enemy five times.',
     detailed: 'Blinds the foe for 4 s (accuracy halved), then 5 lightning bolts, 90% ATK each, 0.6 s apart. Each bolt staggers, or Stuns 0.6 s if the foe is Wet. Can’t be dodged.',
@@ -139,6 +142,7 @@ const NURSE: FighterDef = {
   },
   special: {
     name: 'Code Blue',
+    cooldown: 11,
     quote: 'Not on my watch.',
     simple: "Can't be knocked out for 5 seconds, then heals big.",
     detailed: 'Life Support for 5 s: HP can’t drop below 1. When it ends, heals 20% max HP.',
@@ -173,6 +177,7 @@ const COURIER: FighterDef = {
   },
   special: {
     name: 'Rush Hour',
+    cooldown: 15.5,
     quote: 'Sign here!',
     simple: 'A delivery truck runs the enemy over three times, then a parcel explodes.',
     detailed: '3 truck passes 0.55 s apart, 150% ATK each with sideways knockback, then a parcel bomb: 60% ATK and Stun 1 s. Can’t be dodged.',
@@ -207,6 +212,7 @@ const FISHER: FighterDef = {
   },
   special: {
     name: 'The Big One',
+    cooldown: 12.25,
     quote: "It's a monster!",
     simple: 'A giant fish leaps out under the enemy and soaks them.',
     detailed: '0.6 s shadow warning, then 340% ATK, Stun 1 s and Wet 4 s. Can’t be dodged.',

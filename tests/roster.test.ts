@@ -9,3 +9,9 @@ it('gives every job a unique personal display name', () => {
   });
   expect(new Set(names).size).toBe(ROSTER.length);
 });
+
+it('gives every special a distinct positive charge time', () => {
+  const times = ROSTER.map((fighter) => fighter.special.cooldown);
+  expect(Math.min(...times)).toBeGreaterThan(0);
+  expect(new Set(times).size).toBe(ROSTER.length);
+});

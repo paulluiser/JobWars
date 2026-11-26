@@ -4,7 +4,7 @@ import type { Fighter } from '../sim/types';
 
 /**
  * Fighters bounce without steering. Their choices, in priority order:
- *   1. Special: fire it the moment the rage bar is full, from almost any state.
+ *   1. Special: fire it when ready, from almost any state.
  *   2. Active skill: when it's off cooldown and the kit's condition holds.
  *   3. When the foe is in reach or closing into it: a swing or a charged blow.
  * Whether a swing connects is decided by reach and the attack table in the sim.
