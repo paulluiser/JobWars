@@ -98,6 +98,26 @@ export class Sim {
   surges = 0;
   overtime = false;
 
+  /** Hash only deterministic gameplay state. Timer callbacks are recreated from the input log. */
+  checkpoint(): string {
+    const state = [
+      this.tick, this.t, this.paused, this.surges, this.nextSurge, this.overtime,
+      this.over, this.winner, this.rng.checkpoint(), this.seq, this.hazardId,
+      this.timers.map(({ at, seq }) => [at, seq]), this.fighters, this.hazards,
+    ];
+    const data = JSON.stringify(state, (_key, value: unknown) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+    });
+    let first = 0x811c9dc5, second = 0x9e3779b9;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      first = Math.imul(first ^ char, 0x01000193);
+      second = Math.imul(second ^ char, 0x5bd1e995);
+    }
+    return (first >>> 0).toString(16).padStart(8, '0') + (second >>> 0).toString(16).padStart(8, '0');
+  }
+
   constructor(teams: [FighterDef[], FighterDef[]], readonly seed: number, readonly opts: SimOpts = {}) {
     this.rng = new Rng(seed);
     this.timeLimit = opts.timeLimit ?? TIME_LIMIT;
@@ -153,7 +173,8 @@ export class Sim {
 
   /** Give a team a card (draft or surge pick). */
   addCard(team: Team, id: string) {
-    if (!CARD_BY_ID.has(id)) return;
+    if (!CARD_BY_ID.has(id)) return [];
+    const eventStart = this.events.length;
     for (const f of this.fighters) {
       if (f.team !== team) continue;
       f.cards.push(id);
@@ -164,6 +185,7 @@ export class Sim {
       if (a.startShield && !wasKO) this.applyStatus(f, { kind: 'shield', duration: 999, value: f.maxHp * a.startShield }, f.idx);
     }
     this.emit({ type: 'card', team, id });
+    return this.events.slice(eventStart);
   }
 
   /** Card picks are in: carry on fighting. */

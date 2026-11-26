@@ -99,7 +99,7 @@ export interface PvpView {
   error: string;
 }
 
-export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value?: string) => void) {
+export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value?: string) => void, roomHosted = false) {
   const r = rankOf(v.profile.mmr);
   const next = RANKS[RANKS.indexOf(r) + 1];
   const modes = (Object.keys(PVP_MODES) as PvpMode[]).map((m) => `
@@ -126,7 +126,7 @@ export function renderPvp(panel: HTMLElement, v: PvpView, act: (a: string, value
           ${v.code ? `<div class="lobby-code">Your lobby code<b>${esc(v.code)}</b><button data-m="copycode">Copy</button></div>` : ''}
           ${v.status ? `<div class="pvp-status">${v.busy ? '<i class="spin"></i>' : ''}${esc(v.status)}${v.busy ? ' <button data-m="cancel">Cancel</button>' : ''}</div>` : ''}
           ${v.error ? `<div class="pvp-error">${esc(v.error)}</div>` : ''}
-          <p class="pvp-note">Peer-to-peer: both of you need this page open. Your rating is kept in this browser.</p>
+          <p class="pvp-note">${roomHosted ? 'Online rooms can reconnect after a brief disconnect.' : 'Peer-to-peer: both of you need this page open.'} Your rating is kept in this browser.</p>
         </div>
       </div>
     </div>`, (t) => {

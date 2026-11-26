@@ -2,6 +2,8 @@ import Peer, { type DataConnection } from 'peerjs';
 import { ROSTER, byId } from '../data/roster';
 import { ALL_CARDS, CARD_BY_ID } from '../data/cards';
 import { pvpIceConfig } from './ice';
+import { PVP_MODES, type PvpMode } from './pvpModes';
+export { PVP_MODES, type PvpMode } from './pvpModes';
 
 /**
  * Online PvP over WebRTC (PeerJS, using its free public broker for the handshake only).
@@ -13,14 +15,6 @@ import { pvpIceConfig } from './ice';
  *  - Quick match: a handful of shared "waiting room" ids per mode and rank tier. Join one that
  *    has someone waiting, or claim a free one and wait. Widens to all tiers after a while.
  */
-export type PvpMode = 'classic1' | 'gacha1' | 'classic2' | 'gacha2';
-export const PVP_MODES: Record<PvpMode, { name: string; tag: boolean; gacha: boolean; blurb: string }> = {
-  classic1: { name: 'PvP Classic', tag: false, gacha: false, blurb: '1v1. Pick a job, the fight plays out.' },
-  gacha1: { name: 'PvP Gacha', tag: false, gacha: true, blurb: '1v1. Draft a card every 20 s. 2–3 minute matches.' },
-  classic2: { name: 'Tag Team Classic', tag: true, gacha: false, blurb: '2v2. Pick two jobs, all four on the field.' },
-  gacha2: { name: 'Gacha Tag Team', tag: true, gacha: true, blurb: '2v2 with a card draft every 20 s.' },
-};
-
 /** Both sides must run the same rules: roster and card list must match. */
 const sig = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7).toString(36);
 export const PROTOCOL = `jw2-${sig(ROSTER.map((d) => `${d.id}${d.hp}${d.atk}`).join() + ALL_CARDS.map((c) => c.id).join())}`;

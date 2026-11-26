@@ -9,6 +9,9 @@ import { cpuPick, gachaOpts, offersFor, type Pick } from './modes/gacha';
 import { DraftOverlay, buffPanelHtml } from './ui/cards';
 import { renderLevel, renderMenu, renderPvp, renderPvpPick, renderStoryMap, storyResultHtml, type PvpView } from './ui/menu';
 import { PVP_MODES, PvpSession, type Msg, type PvpMode } from './net/pvp';
+import { clearSavedRoom, RoomClient, roomService, savedRoom } from './net/roomClient';
+import { roomCheckpoint, roomSimulation, stepRoom, SURGE_TICKS, targetTick } from './net/roomSim';
+import type { RoomView } from './net/roomWire';
 import { loadProfile, recordResult, tierOf } from './modes/mmr';
 import { LEVELS, isOpen, judge, loadProgress, saveProgress, type Level } from './modes/story';
 import { TEAM_COLORS, VIS, castColor } from './render/fighterView';
@@ -52,6 +55,17 @@ export interface MatchSpec {
   result?: () => string;
   /** results-screen buttons for this mode (defaults: Rematch / Replay / Share / Change) */
   resultActions?: string;
+}
+
+const ROOM_RESULTS = '<button class="primary" data-act="pvprematch">Rematch</button><button data-act="share">Share this fight</button><button data-act="pvpleave">Leave</button>';
+interface RoomRun {
+  match: number;
+  draft: number;
+  report: string;
+  repair: string;
+  blocked: boolean;
+  shownResult: boolean;
+  fightBuilt: boolean;
 }
 
 const CLASSIC: MatchSpec = { kind: 'cpu', gacha: false, control: ['cpu', 'cpu'] };
@@ -393,6 +407,12 @@ export class Game {
     abort: null, session: null, picks: [], ready: false, oppReady: false, oppPicks: null, inMatch: false,
   };
 
+  private roomLink: RoomClient | null = null;
+  private roomRun: RoomRun | null = null;
+  private roomRound = 0;
+
+  get synchronizedPvp() { return !!this.roomLink; }
+
   showPvp(error = '') {
     this.leaveMatch();
     this.spec = CLASSIC;
@@ -403,8 +423,9 @@ export class Game {
     try { const m = localStorage.getItem('pvpMode') as PvpMode | null; if (m && m in PVP_MODES && !P.view.busy) P.view.mode = m; } catch {}
     P.view.profile = loadProfile();
     if (error) P.view.error = error;
-    const draw = () => renderPvp(this.panel, P.view, (a, v) => void this.pvpAct(a, v, draw));
+    const draw = () => renderPvp(this.panel, P.view, (a, v) => void this.pvpAct(a, v, draw), !!roomService);
     draw();
+    if (!error && roomService && !P.view.busy && !this.roomLink && savedRoom()) void this.pvpAct('resume', undefined, draw);
   }
 
   private async pvpAct(a: string, v: string | undefined, draw: () => void) {
@@ -426,7 +447,8 @@ export class Game {
         return;
       case 'quick':
       case 'host':
-      case 'join': {
+      case 'join':
+      case 'resume': {
         if (V.busy) return;
         const code = (v ?? '').trim().toUpperCase();
         if (a === 'join' && !/^[A-Z0-9]{5}$/.test(code)) {
@@ -447,6 +469,38 @@ export class Game {
         const mmr = loadProfile().mmr;
         const mode = V.mode;
         try {
+          if (roomService) {
+            const destination = a === 'resume' ? savedRoom() : {
+              mode, mmr,
+              code: a === 'join' ? code : undefined,
+              tier: a === 'quick' ? tierOf(mmr) : undefined,
+            };
+            if (!destination) throw new Error('No previous lobby to resume.');
+            status(a === 'resume' ? 'Reconnecting to your lobby…' : 'Connecting…');
+            const room = await RoomClient.open(destination, attempt.signal, status);
+            if (!active()) return room.close();
+            P.abort = null;
+            this.roomLink = room;
+            room.onState = (view) => this.applyRoom(view, draw);
+            room.onStatus = (notice) => {
+              if (this.roomLink !== room) return;
+              if (notice) this.hud.callout(notice, '#ffb02e');
+              if (room.view.phase === 'waiting') {
+                V.status = notice || 'Share the code. Waiting for your opponent…';
+                draw();
+              }
+              if (notice.startsWith('Could not reconnect') || notice.startsWith('This lobby was opened')) {
+                room.close(false);
+                this.roomLink = null;
+                this.roomRun = null;
+                this.roomRound = 0;
+                V.busy = false;
+                this.showPvp(notice);
+              }
+            };
+            this.applyRoom(room.view, draw);
+            return;
+          }
           let session: PvpSession;
           if (a === 'quick') {
             status('Connecting…');
@@ -479,6 +533,201 @@ export class Game {
         return;
       }
     }
+  }
+
+  private applyRoom(view: RoomView, drawLobby: () => void) {
+    const room = this.roomLink;
+    if (!room) return;
+    const P = this.pvp;
+    if (view.phase === 'closed') {
+      room.close(false);
+      this.roomLink = null;
+      this.roomRun = null;
+      this.roomRound = 0;
+      P.view.busy = false;
+      P.view.code = '';
+      P.view.status = '';
+      this.showPvp('The lobby closed.');
+      return;
+    }
+    if (view.phase === 'waiting') {
+      P.view.busy = true;
+      P.view.code = room.code;
+      P.view.status = 'Share the code. Waiting for your opponent…';
+      drawLobby();
+      return;
+    }
+    P.view.busy = false;
+    P.view.code = '';
+    P.view.status = '';
+    if (this.roomRound !== view.match) {
+      this.roomRound = view.match;
+      this.roomRun = null;
+      this.leaveMatch();
+      P.picks = [];
+      P.ready = false;
+    }
+    if (view.phase === 'picks') {
+      const need = PVP_MODES[view.mode].tag ? 2 : 1;
+      const rival = (1 - view.team) as Team;
+      document.body.classList.add('selecting');
+      document.body.classList.remove('pvp', 'drafting');
+      const render = () => renderPvpPick(this.panel, {
+        mode: view.mode, need, picks: view.ready[view.team] ? view.mine.map((id) => byId(id)!) : P.picks,
+        ready: P.ready || view.ready[view.team], oppReady: view.ready[rival], oppMmr: view.rivalMmr, myMmr: loadProfile().mmr,
+      }, (action, id) => {
+        if (action === 'leave') return this.pvpLeave();
+        if (P.ready || view.ready[view.team]) return;
+        if (action === 'pick' && id) {
+          const job = byId(id)!;
+          P.picks = P.picks.includes(job) ? P.picks.filter((pick) => pick !== job) : [...P.picks, job].slice(-need);
+          render();
+        } else if (action === 'ready' && P.picks.length === need) {
+          P.ready = true;
+          room.send({ t: 'lock', match: view.match, ids: P.picks.map((job) => job.id) });
+          render();
+        }
+      });
+      render();
+      return;
+    }
+
+    if (!view.lineups) return;
+    const run = this.roomRun ??= { match: view.match, draft: -1, report: '', repair: '', blocked: false, shownResult: false, fightBuilt: false };
+    if (view.phase === 'draft' && view.pick === 0 && !run.fightBuilt) {
+      this.panel.classList.remove('show', 'wide');
+      document.body.classList.remove('selecting');
+      document.body.classList.add('pvp', 'drafting');
+      this.scene.setArena(view.arena);
+      this.showRoomDraft(room, view, run);
+      return;
+    }
+    if (!run.fightBuilt) {
+      this.sfx.init();
+      this.picks = view.lineups.flat().map((id) => byId(id)!);
+      this.tourney = null;
+      this.match = null;
+      this.spec = {
+        kind: 'pvp', arena: view.arena, gacha: PVP_MODES[view.mode].gacha,
+        control: ['remote', 'remote'], names: view.team === 0 ? ['You', 'Rival'] : ['Rival', 'You'],
+        resultActions: ROOM_RESULTS,
+      };
+      this.draftLog = view.log;
+      this.started = true;
+      this.newFight(view.seed);
+      document.body.classList.add('pvp');
+      run.fightBuilt = true;
+    }
+    this.draftLog = view.log;
+    if (view.phase !== 'draft') {
+      this.draft.cancel();
+      document.body.classList.remove('drafting');
+    }
+    if (view.phase === 'result' && view.result) {
+      if (!run.shownResult) this.showRoomResult(view, run);
+      return;
+    }
+    if (view.repair && run.repair !== view.repair.hash) {
+      run.repair = view.repair.hash;
+      const repaired = roomSimulation(view);
+      const draft = SURGE_TICKS.indexOf(view.repair.tick) + 1;
+      const log = draft ? view.log.filter((pick) => pick.pick < draft) : view.log;
+      stepRoom(repaired, log, view.repair.tick);
+      if (roomCheckpoint(repaired) === view.repair.hash) {
+        this.sim = repaired;
+        this.scene.setFighters(repaired);
+        this.hud.setup(repaired, TEAM_HEX);
+        this.hud.callout('Fight resynchronized');
+      } else {
+        run.blocked = true;
+        this.hud.callout('Simulation differs. Waiting for the room result.', '#ffb02e');
+      }
+    }
+    if (view.phase === 'draft') this.showRoomDraft(room, view, run);
+  }
+
+  private showRoomDraft(room: RoomClient, view: RoomView, run: RoomRun) {
+    if (view.chosen || run.draft === view.pick) return;
+    run.draft = view.pick;
+    document.body.classList.add('drafting');
+    const team = view.team;
+    const fighters = view.lineups![team].map((id) => byId(id)!);
+    const owned = (side: Team) => view.log.filter((p) => p.team === side).map((p) => p.id);
+    let reroll = view.rerolls;
+    const offers = () => offersFor(view.seed, team, view.pick, reroll, fighters, owned(team));
+    void this.draft.pick({
+      title: view.pick === 0 ? 'Choose your first card' : `Card pick ${view.pick + 1}`,
+      subtitle: 'Both players resume together after the draft.',
+      offers: offers(), rerollsLeft: GACHA.rerolls - reroll,
+      timer: Math.max(1, Math.ceil((view.at - room.clock()) / 1000)), serverDeadline: true,
+      detailed: this.select.detailed, team: fighters, owned: owned(team), rivalOwned: owned((1 - team) as Team), rivalName: 'Rival',
+    }, () => {
+      reroll++;
+      room.send({ t: 'reroll', match: view.match, pick: view.pick, reroll });
+      return offers();
+    }).then((card) => {
+      if (this.roomLink === room && room.view.match === view.match && room.view.phase === 'draft' && room.view.pick === view.pick) {
+        room.send({ t: 'card', match: view.match, pick: view.pick, reroll, id: card.id });
+      }
+    });
+  }
+
+  private showRoomResult(view: RoomView, run: RoomRun) {
+    const result = view.result!;
+    run.shownResult = true;
+    this.introT = 0;
+    this.intro.stop();
+    this.sfx.mood('off');
+    if (this.sim.tick !== result.tick || roomCheckpoint(this.sim) !== result.hash) {
+      this.sim = roomSimulation(view);
+      stepRoom(this.sim, view.log, result.tick);
+      this.scene.setFighters(this.sim);
+      this.hud.setup(this.sim, TEAM_HEX);
+    }
+    const confirmed = this.sim.over && roomCheckpoint(this.sim) === result.hash;
+    if (confirmed) {
+      renderResults(this.panel, this.sim, TEAM_HEX, { actions: ROOM_RESULTS, names: this.spec.names });
+    } else {
+      const label = result.winner === -1 ? 'Draw' : result.winner === view.team ? 'You won' : 'Your rival won';
+      this.panel.onclick = null;
+      this.panel.classList.remove('wide');
+      this.panel.innerHTML = `<div class="card"><h1>${label}</h1><p>Result confirmed by the room.</p><div class="actions">${ROOM_RESULTS}</div></div>`;
+      this.panel.classList.add('show');
+    }
+    const key = `jobwars-room-result-${this.roomLink?.code}-${view.seed}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {}
+    const score = result.winner === view.team ? 1 : result.winner === -1 ? 0.5 : 0;
+    const delta = recordResult(view.rivalMmr, score, view.mode);
+    this.hud.callout(`${delta >= 0 ? '+' : ''}${delta} MMR`, delta >= 0 ? '#6dff9a' : '#ff5a46');
+  }
+
+  private tickRoom(room: RoomClient, run: RoomRun) {
+    const view = room.view;
+    if (!run.fightBuilt || run.shownResult || run.blocked || !this.started) return 0;
+    const current = room.clock();
+    if (view.phase === 'fight' && current < view.at) return 0;
+    if (this.introT > 0) {
+      this.introT = 0;
+      this.beginFight();
+    }
+    const target = view.phase === 'draft' ? view.tick : targetTick(view, current);
+    const before = this.sim.tick;
+    const catchUp = target - before > 12;
+    stepRoom(this.sim, view.log, Math.min(target, before + 480), catchUp ? undefined : (events) => this.handle(events));
+    if (this.sim.over || this.sim.paused) {
+      const id = `${this.sim.tick}:${this.sim.over}`;
+      if (run.report !== id) {
+        run.report = id;
+        room.send({
+          t: 'report', match: view.match, tick: this.sim.tick, hash: roomCheckpoint(this.sim),
+          winner: this.sim.over ? this.sim.winner ?? -1 : undefined,
+        });
+      }
+    }
+    return (this.sim.tick - before) * DT;
   }
 
   private pvpConnected(sess: PvpSession) {
@@ -597,6 +846,11 @@ export class Game {
   }
 
   pvpRematch() {
+    if (this.roomLink) {
+      this.roomLink.send({ t: 'rematch', match: this.roomLink.view.match });
+      this.panel.innerHTML = '<div class="card"><h1>Rematch?</h1><p>Waiting for your opponent…</p><div class="actions"><button data-act="pvpleave">Leave</button></div></div>';
+      return;
+    }
     const sess = this.pvp.session;
     if (!sess) return this.showPvp('Your opponent left.');
     sess.send({ t: 'rematch' });
@@ -611,7 +865,13 @@ export class Game {
 
   /** drop any search or connection */
   private pvpEnd() {
+    this.roomLink?.close();
+    this.roomLink = null;
+    this.roomRun = null;
+    this.roomRound = 0;
+    document.body.classList.remove('drafting');
     const P = this.pvp;
+    if (P.abort && roomService) clearSavedRoom();
     P.abort?.abort();
     P.abort = null;
     P.view.busy = false;
@@ -932,7 +1192,11 @@ export class Game {
     this.sfx.update(dt);
     let simDt = 0;
 
-    if (this.introT > 0) {
+    const room = this.roomLink;
+    if (room && this.roomRun) {
+      this.juice.hitstop = Math.max(0, this.juice.hitstop - dt);
+      simDt = this.tickRoom(room, this.roomRun);
+    } else if (this.introT > 0) {
       // VS splash: hold the fight until it's done
       this.introT -= dt;
       if (this.introT <= 0) this.beginFight();
@@ -973,7 +1237,7 @@ export class Game {
       this.scene.focus = { x: v.x, y: v.y - 60, zoomMul: 1.3 + Math.min(0.35, (this.sim.tick - (this.ko.tick - 170)) / 400) };
     }
     const frozen = this.juice.hitstop > 0 || this.cutT > 0 || this.introT > 0;
-    const alpha = frozen ? 1 : Math.min(1, this.acc / DT);
+    const alpha = room || frozen ? 1 : Math.min(1, this.acc / DT);
     this.scene.render(this.sim, alpha, dt, simDt || (this.sim.over ? dt * this.juice.timeScale : 0));
     this.hud.update(this.sim, dt);
 
@@ -997,7 +1261,7 @@ export class Game {
       }
     }
 
-    if (this.endT >= 0 && this.cutT <= 0) {
+    if (!room && this.endT >= 0 && this.cutT <= 0) {
       this.endT -= dt;
       if (this.endT < 0 && this.ko && !this.replaying && !this.replayed && this.juice.enabled && this.replayOn && this.sim.over && this.sim.tick === this.ko.tick) {
         this.startReplay();
@@ -1232,6 +1496,7 @@ export class Game {
             this.castCues(e.a, e.name, true, col);
             if (mode !== 'off') {
               this.cutscene.play(a.def, a.team, mode);
+              if (this.roomLink) break; // the room clock continues during the presentation
               this.cutT = CUTSCENE_DUR[mode];
               this.pending = events.slice(k + 1);
               j.addTrauma(0.3);
@@ -1331,6 +1596,7 @@ export class Game {
           break;
         }
         case 'end': {
+          if (this.roomLink) break; // only display the room-confirmed result
           if (!this.replaying && !this.ended) {
             this.ended = true;
             this.spec.onEnd?.(this.sim);

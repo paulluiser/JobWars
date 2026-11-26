@@ -44,7 +44,28 @@ Add `?layout=portrait` to the URL to force the vertical layout, e.g. for recordi
 Static Vite build, no server. Import the repo in Vercel and it picks up `vercel.json`
 (`npm run build` → `dist/`). Or from the CLI: `npx vercel --prod`.
 
-### Cross-network PvP relay
+### Cloudflare WebSocket PvP
+
+The room service uses SQLite-backed Durable Objects and hibernating WebSockets. It keeps one
+room per invite code and a queue per game mode. The room owns picks, match clocks, reconnect
+seats, and confirmed results. Browsers keep running the seeded combat locally. The room wakes
+for choices and checkpoints, and replays the match if reports disagree or a result needs verification.
+
+1. Run `npm install`, then `npm run pvp:dev` in one terminal.
+2. Run `VITE_PVP_ROOM_URL=http://127.0.0.1:8787 npm run dev` in another terminal. Open
+   `http://127.0.0.1:5173` twice to create and join an invite lobby.
+3. For production, sign in with `npx wrangler login` and run `npm run pvp:deploy`. Use the
+   HTTPS Worker URL printed by Wrangler. Add any custom frontend origin to `WEB_ORIGINS`
+   in `wrangler.jsonc` before deployment.
+4. Set `VITE_PVP_ROOM_URL` to that HTTPS Worker URL in Vercel's Production environment
+   and redeploy the frontend. Test a Classic and a Gacha invite across Wi-Fi and cellular.
+5. When simulator or room rules change, run `npm run pvp:version` and commit the generated file
+   with the changes. Deploy the Worker and frontend from the same commit. The browser and Worker
+   check the rules fingerprint before joining a room.
+
+If `VITE_PVP_ROOM_URL` is unset, Job Wars uses its existing PeerJS transport.
+
+### TURN relay for the PeerJS transport
 
 Job Wars uses PeerJS Cloud for signaling. WebRTC connects directly when the players’ networks
 allow it and falls back to a TURN relay when they don’t.

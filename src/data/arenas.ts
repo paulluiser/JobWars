@@ -1,4 +1,3 @@
-import type { Level } from '../modes/story';
 import { Rng } from '../sim/rng';
 
 export const ARENA_NAMES = {
@@ -33,7 +32,7 @@ export function homeArena(job: string): ArenaId {
   return districts[homeJobs.findIndex((jobs) => jobs.includes(job))] ?? DEFAULT_ARENA;
 }
 
-export function storyArena(level: Pick<Level, 'id' | 'chapter'>): ArenaId {
+export function storyArena(level: { id: string; chapter: number }): ArenaId {
   return level.id === '6-4' ? DEFAULT_ARENA : districts[level.chapter - 1] ?? DEFAULT_ARENA;
 }
 

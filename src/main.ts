@@ -99,10 +99,12 @@ function act(name: string, el?: HTMLElement | null) {
       break;
     }
     case 'pause':
+      if (game.synchronizedPvp) break;
       game.paused = !game.paused;
       setBtn('pause', game.paused ? 'Resume' : 'Pause');
       break;
     case 'speed':
+      if (game.synchronizedPvp) break;
       game.speed = game.speed === 1 ? 2 : 1;
       setBtn('speed', `${game.speed}×`);
       break;

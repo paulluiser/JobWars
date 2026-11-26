@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
+    "build": "node tools/room-version.mjs --check && tsc --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.worker.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "simstats": "tsx tools/simstats.ts",
     "art": "tsx tools/art/cli.ts",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.worker.json",
     "art:prompts": "tsx tools/art/prompts.ts",
     "tune": "tsx tools/tune.ts",
     "tagstats": "tsx tools/tagstats.ts",
@@ -18,18 +18,23 @@
     "sfx": "tsx tools/sfx/build.ts",
     "tune:gacha": "tsx tools/tunegacha.ts",
     "gachastats": "tsx tools/gachastats.ts",
-    "art:cards": "tsx tools/art/cardprompt.ts"
+    "art:cards": "tsx tools/art/cardprompt.ts",
+    "pvp:version": "node tools/room-version.mjs",
+    "pvp:dev": "wrangler dev --port 8787",
+    "pvp:deploy": "wrangler deploy"
   },
   "dependencies": {
     "peerjs": "^1.5.4",
     "pixi.js": "^8.23.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261125.1",
     "@types/node": "^26.6.10",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^8.3.8",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "wrangler": "4.168.0"
   }
 }

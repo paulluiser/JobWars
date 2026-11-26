@@ -31,6 +31,7 @@ export interface DraftView {
   rerollsLeft: number;
   /** seconds to choose (0 = no timer) */
   timer: number;
+  serverDeadline?: boolean;
   detailed: boolean;
   /** this side's team and cards so far */
   team: FighterDef[];
@@ -90,7 +91,10 @@ export class DraftOverlay {
         left -= 1;
         const t = this.el.querySelector('.dr-timer');
         if (t) t.textContent = `${left}s`;
-        if (left <= 0 && this.v) this.finish(this.v.offers[Math.floor(Math.random() * this.v.offers.length)]);
+        if (left <= 0 && this.v) {
+          if (this.v.serverDeadline) this.cancel();
+          else this.finish(this.v.offers[Math.floor(Math.random() * this.v.offers.length)]);
+        }
       }, 1000);
     }
     return new Promise((res) => (this.done = res));
